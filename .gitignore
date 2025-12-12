@@ -1,0 +1,4 @@
+musiccaps/ 
+music_data/
+.gradio/
+*.wav
