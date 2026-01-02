@@ -50,3 +50,6 @@ logs/
 data/
 *.h5
 *.hdf5
+
+*.exe
+*.deb
