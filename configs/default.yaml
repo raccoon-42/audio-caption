@@ -1,0 +1,52 @@
+# Default configuration for audio captioning
+
+# Model configurations
+audio_encoder:
+  name: clap
+  model_name: laion/clap-htsat-unfused
+  freeze: true
+
+language_model:
+  name: gpt2
+  model_name: gpt2
+  freeze: true
+
+projection:
+  name: sequential
+  prefix_len: 8
+  layers:
+    - type: linear
+      out_features: 3072  # 768 * 4
+    - type: gelu
+    - type: dropout
+      p: 0.3
+    - type: linear
+      out_features: 6144  # 8 * 768 (prefix_len * lm_dim)
+
+# Training configuration
+training:
+  optimizer:
+    type: AdamW
+    lr: 5e-4
+    weight_decay: 0.1
+  checkpoint_dir: checkpoints
+  save_every_n_epochs: 5  # Save checkpoint every N epochs
+  save_best: true  # Save best model based on validation loss
+  save_last: true  # Save final checkpoint
+
+# Dataset configuration
+test_size: 0.1
+seed: 42
+
+# Training parameters
+epochs: 30
+prefix_len: 8
+
+# Stage 2 configuration (optional)
+run_stage2: false  # Set to true to automatically run Stage 2 after Stage 1
+stage2:
+  epochs: 10
+  optimizer:
+    projection_lr: 1e-4
+    language_model_lr: 5e-6
+    weight_decay: 0.1

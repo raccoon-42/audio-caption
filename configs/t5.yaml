@@ -1,0 +1,52 @@
+# Configuration for T5 language model
+
+# Model configurations
+audio_encoder:
+  name: clap
+  model_name: laion/clap-htsat-unfused
+  freeze: true
+
+language_model:
+  name: t5
+  model_name: t5-small  # Options: t5-small, t5-base, t5-large, t5-3b, t5-11b
+  freeze: true
+
+projection:
+  name: sequential
+  prefix_len: 8
+  layers:
+    - type: linear
+      out_features: 3072  # Adjust based on T5 d_model (512 for t5-small)
+    - type: gelu
+    - type: dropout
+      p: 0.3
+    - type: linear
+      out_features: 4096  # 8 * 512 (prefix_len * t5-small d_model)
+
+# Training configuration
+training:
+  optimizer:
+    type: AdamW
+    lr: 5e-4
+    weight_decay: 0.1
+  checkpoint_dir: checkpoints
+  save_every_n_epochs: 5
+  save_best: true
+  save_last: true
+
+# Dataset configuration
+test_size: 0.1
+seed: 42
+
+# Training parameters
+epochs: 30
+prefix_len: 8
+
+# Stage 2 configuration (optional)
+run_stage2: false
+stage2:
+  epochs: 10
+  optimizer:
+    projection_lr: 1e-4
+    language_model_lr: 5e-6
+    weight_decay: 0.1
