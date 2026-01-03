@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-01-03T22:13:54.206468",
+  "num_samples": 531,
+  "metrics": {
+    "BLEU_4": 0.05539568403674989,
+    "METEOR": 0.22841860121534496,
+    "ROUGE_L": 0.23633819927847854,
+    "CIDEr": 0.08998216747042387,
+    "SPIDER": 0.15253366300024931
+  },
+  "config": {
+    "use_beam_search": true,
+    "max_length": 80,
+    "min_length": 20
+  }
+}
