@@ -63,7 +63,7 @@ class CLAPAudioEncoder(AudioEncoder):
         
         # Process with CLAP
         inputs = self.processor(
-            audios=audio_array,
+            audio=audio_array,
             sampling_rate=48000,
             return_tensors="pt"
         ).to(self.device)
