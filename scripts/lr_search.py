@@ -94,8 +94,8 @@ def run_stage(train_fn, eval_fn, projection, lm, train_loader, val_loader,
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True, choices=["gpt2", "t5", "opt"])
-    parser.add_argument("--n-trials", type=int, default=8)
-    parser.add_argument("--epochs-per-stage", type=int, default=5)
+    parser.add_argument("--n-trials", type=int, default=16)
+    parser.add_argument("--epochs-per-stage", type=int, default=8)
     parser.add_argument("--patience", type=int, default=3)
     args = parser.parse_args()
 
