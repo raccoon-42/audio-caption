@@ -78,6 +78,7 @@ def run_stage(train_fn, eval_fn, projection, lm, train_loader, val_loader,
               optimizer, prefix_len, device, max_epochs, patience, trial, epoch_offset,
               t_max=None):
     best_val = float("inf")
+    best_epoch = 0
     patience_counter = 0
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=t_max or max_epochs)
 
@@ -99,6 +100,7 @@ def run_stage(train_fn, eval_fn, projection, lm, train_loader, val_loader,
 
         if val_loss < best_val:
             best_val = val_loss
+            best_epoch = epoch
             patience_counter = 0
         else:
             patience_counter += 1
@@ -106,7 +108,7 @@ def run_stage(train_fn, eval_fn, projection, lm, train_loader, val_loader,
                 print(f"  [{stage}] Early stopping at epoch {epoch}")
                 break
 
-    return best_val
+    return best_val, best_epoch
 
 
 def main():
@@ -154,12 +156,14 @@ def main():
         print("Stage 1 LR search")
         print(f"{'='*50}")
 
+        s1_range = SEARCH_RANGES[args.model]["s1_lr"]
+
         def s1_objective(trial):
-            lo, hi = SEARCH_RANGES[args.model]["s1_lr"]
+            lo, hi = s1_range
             s1_lr = trial.suggest_float("stage1_lr", lo, hi, log=True)
 
             print(f"\n--- S1 Trial {trial.number} ---")
-            print(f"  stage1_lr={s1_lr:.6g}")
+            print(f"  stage1_lr={s1_lr:.6g}  (range: [{lo:.1e}, {hi:.1e}])")
 
             set_seed(seed)
             projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout).to(device)
@@ -172,16 +176,26 @@ def main():
             optimizer = torch.optim.AdamW(
                 projection.parameters(), lr=s1_lr, weight_decay=cfg["weight_decay"]
             )
-            s1_val = run_stage(
+            s1_val, s1_best_epoch = run_stage(
                 train_fn, eval_fn, projection, lm, train_loader, val_loader,
                 optimizer, prefix_len, device, args.epochs_per_stage, args.patience,
                 trial, epoch_offset=0, t_max=args.epochs_per_stage,
             )
 
             try:
-                is_best = s1_val <= trial.study.best_value
+                study_best = trial.study.best_value
+                study_best_trial = trial.study.best_trial.number
+                is_best = s1_val <= study_best
             except ValueError:
+                study_best = None
+                study_best_trial = None
                 is_best = True
+
+            print(f"  Trial {trial.number}: val={s1_val:.4f} (best epoch {s1_best_epoch})"
+                  f"  | Study best: trial {study_best_trial} val={study_best:.4f}"
+                  if study_best is not None else
+                  f"  Trial {trial.number}: val={s1_val:.4f} (best epoch {s1_best_epoch})"
+                  f"  | First trial")
 
             if is_best:
                 torch.save(projection.state_dict(), s1_proj_path)
@@ -239,14 +253,18 @@ def main():
 
         best_s1_projection_state = torch.load(s1_proj_path, weights_only=True, map_location=device)
 
+        s2_proj_range = SEARCH_RANGES[args.model]["s2_proj_lr"]
+        s2_lm_range = SEARCH_RANGES[args.model]["s2_lm_lr"]
+
         def s2_objective(trial):
-            lo, hi = SEARCH_RANGES[args.model]["s2_proj_lr"]
+            lo, hi = s2_proj_range
             s2_proj_lr = trial.suggest_float("stage2_proj_lr", lo, hi, log=True)
-            lo, hi = SEARCH_RANGES[args.model]["s2_lm_lr"]
+            lo, hi = s2_lm_range
             s2_lm_lr = trial.suggest_float("stage2_lm_lr", lo, hi, log=True)
 
             print(f"\n--- S2 Trial {trial.number} ---")
-            print(f"  stage2_proj_lr={s2_proj_lr:.6g}  stage2_lm_lr={s2_lm_lr:.6g}")
+            print(f"  stage2_proj_lr={s2_proj_lr:.6g}  (range: [{s2_proj_range[0]:.1e}, {s2_proj_range[1]:.1e}])")
+            print(f"  stage2_lm_lr={s2_lm_lr:.6g}    (range: [{s2_lm_range[0]:.1e}, {s2_lm_range[1]:.1e}])")
 
             set_seed(seed)
             projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout).to(device)
@@ -262,11 +280,24 @@ def main():
                 {"params": lm.parameters(), "lr": s2_lm_lr},
             ], weight_decay=cfg["weight_decay"])
 
-            s2_val = run_stage(
+            s2_val, s2_best_epoch = run_stage(
                 train_fn, eval_fn, projection, lm, train_loader, val_loader,
                 optimizer, prefix_len, device, args.epochs_per_stage, args.patience,
                 trial, epoch_offset=0, t_max=args.epochs_per_stage,
             )
+
+            try:
+                study_best = trial.study.best_value
+                study_best_trial = trial.study.best_trial.number
+            except ValueError:
+                study_best = None
+                study_best_trial = None
+
+            print(f"  Trial {trial.number}: val={s2_val:.4f} (best epoch {s2_best_epoch})"
+                  f"  | Study best: trial {study_best_trial} val={study_best:.4f}"
+                  if study_best is not None else
+                  f"  Trial {trial.number}: val={s2_val:.4f} (best epoch {s2_best_epoch})"
+                  f"  | First trial")
 
             return s2_val
 
