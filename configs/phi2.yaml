@@ -4,7 +4,7 @@ batch_size: 4
 dropout: 0.3
 weight_decay: 0.1
 test_size: 0.1
-model_name: microsoft/phi-2
+model_name: /home/aliozkaya/hf_models/phi-2
 data_dir: data/dataset
 checkpoint_dir: checkpoints
 results_dir: results
