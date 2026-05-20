@@ -136,6 +136,13 @@ def generate_caption(model_key, model, projection, tokenizer, audio_emb,
     return caption
 
 
+def trim_incomplete_sentence(text):
+    match = re.search(r'(.*[.!?])', text)
+    if match:
+        return match.group(1).strip()
+    return text.strip()
+
+
 def compute_cider(references, hypotheses, n=4):
     """CIDEr-D metric."""
     doc_freq = Counter()
@@ -317,6 +324,9 @@ def main():
                 prefix_len, device, gen_kwargs,
             )
 
+            if args.trim_incomplete:
+                caption = trim_incomplete_sentence(caption)
+
             references.append(test_data[i]["caption"])
             hypotheses.append(caption)
         except Exception as e:
@@ -341,6 +351,7 @@ def main():
         "seed": seed,
         "num_samples": len(hypotheses),
         "num_failed": failed,
+        "trim_incomplete": args.trim_incomplete,
         "gen_kwargs": gen_kwargs,
         "metrics": metrics,
         "predictions": [
@@ -361,6 +372,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-__name__ == "__main__":
-    main()
-   main()

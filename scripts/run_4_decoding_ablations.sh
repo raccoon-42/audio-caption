@@ -65,6 +65,9 @@ for m in "$@"; do
     run $m sample_t0.7_p0.9 --do-sample --temperature 0.7 --top-p 0.9
     run $m sample_t0.9_p0.95 --do-sample --temperature 0.9 --top-p 0.95
     run $m sample_t1.0_p0.95 --do-sample --temperature 1.0 --top-p 0.95
+
+    # Ablation: sentence trimming
+    run $m trim_incomplete --trim-incomplete
 done
 
 if [ -n "$FAILED" ]; then
