@@ -7,19 +7,19 @@ from torch.utils.data import Dataset, DataLoader
 
 class MusicCapsDataset(Dataset):
     def __init__(self, hf_dataset, tokenizer, clap_embeddings, max_len=64):
-        self.data = hf_dataset
+        self.captions = hf_dataset["caption"]
         self.tokenizer = tokenizer
         self.clap_embeddings = clap_embeddings
         self.max_len = max_len
 
     def __len__(self):
-        return len(self.data)
+        return len(self.captions)
 
     def __getitem__(self, idx):
         audio_emb = self.clap_embeddings[idx]
 
         tokens = self.tokenizer(
-            self.data[idx]["caption"],
+            self.captions[idx],
             max_length=self.max_len,
             padding="max_length",
             truncation=True,
