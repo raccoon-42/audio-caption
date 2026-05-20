@@ -23,6 +23,12 @@ train_and_eval() {
     echo ""
 }
 
+# Baselines first (default architecture with Optuna-tuned LRs)
+for model in gpt2 t5 opt; do
+    train_and_eval $model $model
+done
+
+# Architectural ablations
 for model in gpt2 t5 opt; do
     # prefix_len ablations
     train_and_eval $model ${model}_prefix4 --prefix-len 4

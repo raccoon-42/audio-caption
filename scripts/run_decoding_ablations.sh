@@ -4,11 +4,19 @@ MODELS="gpt2 t5 opt"
 EVAL="uv run python scripts/evaluate.py --stage 2"
 FAILED=""
 
+# Optional: pass --ckpt-tag per model via env vars
+# e.g. CKPT_gpt2=gpt2_prefix4 CKPT_t5=t5 CKPT_opt=opt_depth3 ./scripts/run_decoding_ablations.sh
+get_ckpt_tag() {
+    local var="CKPT_$1"
+    echo "${!var:-$1}"
+}
+
 run() {
     local model=$1 tag=$2
     shift 2
-    echo "=== $model | $tag ==="
-    if ! $EVAL --model "$model" --ablation-tag "$tag" "$@"; then
+    local ckpt_tag=$(get_ckpt_tag "$model")
+    echo "=== $model (ckpt=$ckpt_tag) | $tag ==="
+    if ! $EVAL --model "$model" --ckpt-tag "$ckpt_tag" --ablation-tag "$tag" "$@"; then
         echo "FAILED: $model | $tag"
         FAILED="$FAILED $model|$tag"
     fi
@@ -42,7 +50,7 @@ for m in $MODELS; do
     # Ablation 5: rep_penalty + no_repeat_ngram combined
     run $m rep1.2_ngram3 --repetition-penalty 1.2 --no-repeat-ngram-size 3
 
-    # Ablation 6: beam search + length_penalty (beam4_lp1.0 skipped, same as beam_4)
+    # Ablation 6: beam search + length_penalty
     run $m beam4_lp0.6 --num-beams 4 --length-penalty 0.6
     run $m beam4_lp1.5 --num-beams 4 --length-penalty 1.5
 

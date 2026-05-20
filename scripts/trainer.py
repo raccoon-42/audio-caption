@@ -4,35 +4,24 @@ import json
 from pathlib import Path
 
 import torch
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 
 def train_loop(train_fn, eval_fn, optimizer, max_epochs, patience, stage_label,
-               ckpt_paths, device):
-    """Run a training loop with early stopping.
-
-    Args:
-        train_fn: callable() -> train_loss
-        eval_fn: callable() -> val_loss
-        optimizer: torch optimizer
-        max_epochs: maximum number of epochs
-        patience: early stopping patience
-        stage_label: e.g. "S1" or "S2" for logging
-        ckpt_paths: dict of name -> path for best checkpoints,
-                    e.g. {"proj": path} or {"proj": path, "lm": path}
-        device: torch device
-
-    Returns:
-        (best_val_loss, history, stopped_epoch)
-    """
+               ckpt_paths, device, t_max=None):
     best_val = float("inf")
     patience_counter = 0
     history = []
+    scheduler = CosineAnnealingLR(optimizer, T_max=t_max or max_epochs)
 
     for epoch in range(1, max_epochs + 1):
         train_loss = train_fn()
         val_loss = eval_fn()
+        scheduler.step()
+
+        lr_str = ", ".join(f"{pg['lr']:.2e}" for pg in optimizer.param_groups)
         print(f"[{stage_label}] Epoch {epoch}/{max_epochs}  "
-              f"train_loss={train_loss:.4f}  val_loss={val_loss:.4f}")
+              f"train_loss={train_loss:.4f}  val_loss={val_loss:.4f}  lr=[{lr_str}]")
         history.append({"epoch": epoch, "train_loss": train_loss, "val_loss": val_loss})
 
         if val_loss < best_val:

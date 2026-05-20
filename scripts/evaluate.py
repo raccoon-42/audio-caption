@@ -334,7 +334,7 @@ def main():
     for k, v in metrics.items():
         print(f"  {k}: {v:.4f}")
 
-    results_dir = Path(cfg["results_dir"])
+    results_dir = Path(cfg["results_dir"]) / args.model
     results_dir.mkdir(parents=True, exist_ok=True)
 
     results = {

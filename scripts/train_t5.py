@@ -128,7 +128,7 @@ def main():
     tag = args.ablation_tag or "t5"
     ckpt_dir = Path(cfg["checkpoint_dir"]) / tag
     ckpt_dir.mkdir(parents=True, exist_ok=True)
-    results_dir = Path(cfg["results_dir"])
+    results_dir = Path(cfg["results_dir"]) / "t5"
     results_dir.mkdir(parents=True, exist_ok=True)
 
     # ========== STAGE 1: projection only ==========
@@ -147,6 +147,7 @@ def main():
         stage_label="S1",
         ckpt_paths={"proj": (projection.state_dict, ckpt_dir / "stage1_best.pt")},
         device=device,
+        t_max=30,
     )
     torch.save(projection.state_dict(), ckpt_dir / "stage1_last.pt")
 
@@ -189,6 +190,7 @@ def main():
             "lm": (t5.state_dict, ckpt_dir / "stage2_t5_best.pt"),
         },
         device=device,
+        t_max=20,
     )
     torch.save(projection.state_dict(), ckpt_dir / "stage2_proj_last.pt")
     torch.save(t5.state_dict(), ckpt_dir / "stage2_t5_last.pt")
