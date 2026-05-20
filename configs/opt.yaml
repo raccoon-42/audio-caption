@@ -5,16 +5,13 @@ dropout: 0.3
 weight_decay: 0.1
 test_size: 0.1
 model_name: facebook/opt-350m
-
 data_dir: data/dataset
 checkpoint_dir: checkpoints
 results_dir: results
-
 stage1:
   epochs: 30
-  lr: 0.0005
-
+  lr: 0.0003580815953185052
 stage2:
   epochs: 30
-  projection_lr: 0.0001
-  lm_lr: 0.000005
+  projection_lr: 0.00011759566353992978
+  lm_lr: 1.1062571091837615e-05
