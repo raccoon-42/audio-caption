@@ -6,7 +6,6 @@ import math
 from collections import Counter
 from pathlib import Path
 
-import librosa
 import numpy as np
 import torch
 import yaml
@@ -19,8 +18,6 @@ from tqdm import tqdm
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
-    ClapModel,
-    ClapProcessor,
     GPT2LMHeadModel,
     GPT2Tokenizer,
     OPTForCausalLM,
@@ -277,10 +274,10 @@ def main():
 
     model_name = cfg.get("model_name", DEFAULT_MODEL_NAMES.get(args.model, args.model))
 
-    print("Loading CLAP...")
-    clap_processor = ClapProcessor.from_pretrained("laion/clap-htsat-unfused")
-    clap_model = ClapModel.from_pretrained("laion/clap-htsat-unfused").to(device).eval()
-    audio_dim = clap_model.config.projection_dim
+    print("Loading precomputed CLAP embeddings...")
+    data_dir = Path(cfg["data_dir"])
+    all_clap = torch.load(data_dir.parent / "clap_embeddings.pt", weights_only=True)
+    audio_dim = all_clap.shape[1]
 
     print(f"Loading {model_name}...")
     model, tokenizer, lm_dim, model_type = load_model(args.model, model_name, device)
@@ -291,9 +288,11 @@ def main():
     load_checkpoints(args.model, model, projection, args.stage, ckpt_dir)
     projection.eval()
 
-    ds = load_from_disk(cfg["data_dir"])
+    ds = load_from_disk(str(data_dir))
     split = ds.train_test_split(test_size=cfg["test_size"], seed=seed)
     test_data = split["test"]
+    test_indices = split["test"]._indices.column("indices").to_pylist()
+    test_clap = all_clap[test_indices]
 
     gen_kwargs = dict(
         max_new_tokens=args.max_new_tokens,
@@ -319,28 +318,14 @@ def main():
 
     for i in tqdm(range(len(test_data)), desc="Generating"):
         try:
-            sample = test_data[i]
-            audio_array = sample["audio"]["array"]
-            sr = sample["audio"]["sampling_rate"]
-
-            if audio_array.ndim == 2:
-                audio_array = audio_array.mean(axis=1)
-            if sr != 48000:
-                audio_array = librosa.resample(audio_array, orig_sr=sr, target_sr=48000)
-
-            inputs = clap_processor(audio=audio_array, sampling_rate=48000, return_tensors="pt")
-            out = clap_model.get_audio_features(
-                **{k: v.to(device) for k, v in inputs.items()}
-            )
-            audio_emb = out if isinstance(out, torch.Tensor) else out.pooler_output
-            audio_emb = audio_emb.squeeze(0)
+            audio_emb = test_clap[i].to(device)
 
             caption = generate_caption(
                 args.model, model, projection, tokenizer, audio_emb,
                 prefix_len, device, gen_kwargs,
             )
 
-            references.append(sample["caption"])
+            references.append(test_data[i]["caption"])
             hypotheses.append(caption)
         except Exception as e:
             failed += 1
