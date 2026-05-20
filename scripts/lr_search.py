@@ -64,9 +64,7 @@ def load_model(model_key, cfg, device):
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
-        lm = AutoModelForCausalLM.from_pretrained(
-            model_name, torch_dtype=torch.float32
-        ).to(device)
+        lm = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float32).to(device)
         lm_dim = lm.config.hidden_size
 
     lm.eval()

@@ -36,31 +36,25 @@ uv run python scripts/prepare_data.py
 uv run python scripts/prepare_data.py --precompute-clap
 ```
 
-### 3. Run the full pipeline
+### 3. Run the pipeline (step by step)
 
-For GPT-2, T5, and OPT:
-
-```bash
-./scripts/run_full_pipeline.sh
-```
-
-For LLaMA:
+Each script takes model names as arguments and skips already-completed runs.
 
 ```bash
-./scripts/run_new_models_pipeline.sh
+# Step 1: LR search (re-search if ceiling/flooring detected)
+./scripts/run_1_lr_search.sh gpt2 t5 opt llama
+
+# Step 2: Train and evaluate baselines
+./scripts/run_2_baselines.sh gpt2 t5 opt llama
+
+# Step 3: Architectural ablations
+./scripts/run_3_arch_ablations.sh gpt2 t5 opt llama
+
+# Step 4: Decoding ablations (eval-only, on baseline checkpoint)
+./scripts/run_4_decoding_ablations.sh gpt2 t5 opt llama
 ```
 
-Each pipeline runs: CLAP precomputation (if needed) -> LR search -> baseline training -> architectural ablations.
-
-### 4. Decoding ablations
-
-After training, run decoding ablations on the best checkpoint per model:
-
-```bash
-CKPT_gpt2=<best_tag> CKPT_t5=<best_tag> CKPT_opt=<best_tag> ./scripts/run_decoding_ablations.sh
-```
-
-### 5. Evaluate a single model
+### 4. Evaluate a single model
 
 ```bash
 uv run python scripts/evaluate.py --model gpt2 --stage 2
@@ -83,7 +77,7 @@ uv run python scripts/evaluate.py --model gpt2 --stage 2
 - Dropout: 0.1, 0.3, 0.5
 - Projection depth: 1, 2, 3
 
-**Decoding** (applied to best checkpoint):
+**Decoding** (applied to baseline checkpoint):
 - Repetition penalty
 - Beam search + length penalty
 - N-gram blocking
@@ -109,9 +103,10 @@ scripts/
   projection.py        Shared MLP projection module
   trainer.py           Shared training loop + early stopping
   utils.py             Seed setting
-  run_full_pipeline.sh          GPT-2 / T5 / OPT pipeline
-  run_new_models_pipeline.sh    LLaMA pipeline
-  run_decoding_ablations.sh     Decoding ablation sweeps
+  run_1_lr_search.sh       LR search per model
+  run_2_baselines.sh       Train + eval baselines
+  run_3_arch_ablations.sh  Train + eval arch ablations
+  run_4_decoding_ablations.sh  Eval-only decoding ablations
 data/                 Dataset and cached embeddings
 checkpoints/          Model checkpoints (per tag)
 results/              JSON results (per model, per ablation)
