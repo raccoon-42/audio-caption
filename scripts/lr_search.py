@@ -67,13 +67,20 @@ def run_stage(train_fn, eval_fn, projection, lm, train_loader, val_loader,
     patience_counter = 0
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=t_max or max_epochs)
 
+    stage = "S1" if epoch_offset == 0 else "S2"
+
     for epoch in range(1, max_epochs + 1):
         train_loss = train_fn(projection, lm, train_loader, optimizer, prefix_len, device)
         val_loss = eval_fn(projection, lm, val_loader, prefix_len, device)
         scheduler.step()
 
+        lr_str = ", ".join(f"{pg['lr']:.2e}" for pg in optimizer.param_groups)
+        print(f"  [{stage}] Epoch {epoch}/{max_epochs}  "
+              f"train={train_loss:.4f}  val={val_loss:.4f}  lr=[{lr_str}]")
+
         trial.report(val_loss, epoch_offset + epoch)
         if trial.should_prune():
+            print(f"  [{stage}] Pruned at epoch {epoch}")
             raise optuna.TrialPruned()
 
         if val_loss < best_val:
@@ -82,6 +89,7 @@ def run_stage(train_fn, eval_fn, projection, lm, train_loader, val_loader,
         else:
             patience_counter += 1
             if patience_counter >= patience:
+                print(f"  [{stage}] Early stopping at epoch {epoch}")
                 break
 
     return best_val
@@ -130,6 +138,9 @@ def main():
         s1_lr = trial.suggest_float("stage1_lr", 1e-5, 1e-2, log=True)
         s2_proj_lr = trial.suggest_float("stage2_proj_lr", 1e-5, 1e-3, log=True)
         s2_lm_lr = trial.suggest_float("stage2_lm_lr", 1e-7, 1e-4, log=True)
+
+        print(f"\n--- Trial {trial.number} ---")
+        print(f"  stage1_lr={s1_lr:.6g}  stage2_proj_lr={s2_proj_lr:.6g}  stage2_lm_lr={s2_lm_lr:.6g}")
 
         set_seed(seed)
 
