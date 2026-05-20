@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Prevent Hugging Face hub bug during network instability/offline use
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+
 echo "===== PRECOMPUTE CLAP EMBEDDINGS ====="
 if [ -f "data/clap_embeddings.pt" ]; then
     echo "SKIP: clap_embeddings.pt already exists"

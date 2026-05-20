@@ -152,7 +152,7 @@ def main():
         s1_val = run_stage(
             train_fn, eval_fn, projection, lm, train_loader, val_loader,
             optimizer, prefix_len, device, args.epochs_per_stage, args.patience,
-            trial, epoch_offset=0, t_max=30,
+            trial, epoch_offset=0, t_max=args.epochs_per_stage,
         )
 
         try:
@@ -200,7 +200,7 @@ def main():
         dummy_trial = s1_study.ask()
         run_stage(train_fn, eval_fn, projection, lm, train_loader, val_loader,
                   optimizer, prefix_len, device, args.epochs_per_stage, args.patience,
-                  dummy_trial, epoch_offset=0, t_max=30)
+                  dummy_trial, epoch_offset=0, t_max=args.epochs_per_stage)
         torch.save(projection.state_dict(), s1_proj_path)
 
     # ---- Stage 2 search: find best S2 LRs using best S1 projection ----
@@ -234,7 +234,7 @@ def main():
         s2_val = run_stage(
             train_fn, eval_fn, projection, lm, train_loader, val_loader,
             optimizer, prefix_len, device, args.epochs_per_stage, args.patience,
-            trial, epoch_offset=0, t_max=20,
+            trial, epoch_offset=0, t_max=args.epochs_per_stage,
         )
 
         return s2_val
