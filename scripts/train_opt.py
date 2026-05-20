@@ -1,7 +1,6 @@
 """Self-contained OPT audio captioning training script (stage 1 + stage 2)."""
 
 import argparse
-import json
 from pathlib import Path
 
 import torch
@@ -13,6 +12,7 @@ from transformers import ClapModel, ClapProcessor, OPTForCausalLM, AutoTokenizer
 
 from dataset import MusicCapsDataset
 from projection import Projection
+from trainer import train_loop, save_results
 from utils import set_seed
 
 
@@ -86,6 +86,7 @@ def main():
     parser.add_argument("--prefix-len", type=int, default=None)
     parser.add_argument("--dropout", type=float, default=None)
     parser.add_argument("--proj-depth", type=int, default=2)
+    parser.add_argument("--patience", type=int, default=5)
     parser.add_argument("--ablation-tag", type=str, default=None)
     args = parser.parse_args()
 
@@ -145,35 +146,30 @@ def main():
         projection.parameters(), lr=s1["lr"], weight_decay=cfg["weight_decay"]
     )
 
-    best_val = float("inf")
-    history_s1 = []
-    for epoch in range(1, s1["epochs"] + 1):
-        train_loss = train_one_epoch(
-            projection, model, train_loader, optimizer, prefix_len, device
-        )
-        val_loss = evaluate(projection, model, val_loader, prefix_len, device)
-        print(f"[S1] Epoch {epoch}/{s1['epochs']}  train_loss={train_loss:.4f}  val_loss={val_loss:.4f}")
-        history_s1.append({"epoch": epoch, "train_loss": train_loss, "val_loss": val_loss})
-
-        if val_loss < best_val:
-            best_val = val_loss
-            torch.save(projection.state_dict(), ckpt_dir / "stage1_best.pt")
-
+    best_val, history_s1 = train_loop(
+        train_fn=lambda: train_one_epoch(projection, model, train_loader, optimizer, prefix_len, device),
+        eval_fn=lambda: evaluate(projection, model, val_loader, prefix_len, device),
+        optimizer=optimizer,
+        max_epochs=s1["epochs"],
+        patience=args.patience,
+        stage_label="S1",
+        ckpt_paths={"proj": (projection.state_dict, ckpt_dir / "stage1_best.pt")},
+        device=device,
+    )
     torch.save(projection.state_dict(), ckpt_dir / "stage1_last.pt")
 
-    stage1_results = {
-        "model": model_name, "stage": 1, "seed": seed,
-        "best_val_loss": best_val,
-        "history": history_s1,
-        "hyperparams": {
+    save_results(
+        results_dir / f"{tag}_stage1.json",
+        model_name=model_name, stage=1, seed=seed,
+        best_val=best_val, history=history_s1,
+        hyperparams={
             "prefix_len": prefix_len, "lr": s1["lr"],
-            "epochs": s1["epochs"], "batch_size": cfg["batch_size"],
+            "max_epochs": s1["epochs"], "patience": args.patience,
+            "batch_size": cfg["batch_size"],
             "weight_decay": cfg["weight_decay"], "dropout": dropout,
             "proj_depth": args.proj_depth,
         },
-    }
-    with open(results_dir / f"{tag}_stage1.json", "w") as f:
-        json.dump(stage1_results, f, indent=2)
+    )
 
     # ========== STAGE 2: projection + OPT fine-tune ==========
     print(f"=== Stage 2: fine-tuning projection + {model_name} ===")
@@ -189,38 +185,35 @@ def main():
         {"params": model.parameters(), "lr": s2["lm_lr"]},
     ], weight_decay=cfg["weight_decay"])
 
-    best_val = float("inf")
-    history_s2 = []
-    for epoch in range(1, s2["epochs"] + 1):
-        train_loss = train_one_epoch(
-            projection, model, train_loader, optimizer, prefix_len, device
-        )
-        val_loss = evaluate(projection, model, val_loader, prefix_len, device)
-        print(f"[S2] Epoch {epoch}/{s2['epochs']}  train_loss={train_loss:.4f}  val_loss={val_loss:.4f}")
-        history_s2.append({"epoch": epoch, "train_loss": train_loss, "val_loss": val_loss})
-
-        if val_loss < best_val:
-            best_val = val_loss
-            torch.save(projection.state_dict(), ckpt_dir / "stage2_proj_best.pt")
-            torch.save(model.state_dict(), ckpt_dir / "stage2_opt_best.pt")
-
+    best_val, history_s2 = train_loop(
+        train_fn=lambda: train_one_epoch(projection, model, train_loader, optimizer, prefix_len, device),
+        eval_fn=lambda: evaluate(projection, model, val_loader, prefix_len, device),
+        optimizer=optimizer,
+        max_epochs=s2["epochs"],
+        patience=args.patience,
+        stage_label="S2",
+        ckpt_paths={
+            "proj": (projection.state_dict, ckpt_dir / "stage2_proj_best.pt"),
+            "lm": (model.state_dict, ckpt_dir / "stage2_opt_best.pt"),
+        },
+        device=device,
+    )
     torch.save(projection.state_dict(), ckpt_dir / "stage2_proj_last.pt")
     torch.save(model.state_dict(), ckpt_dir / "stage2_opt_last.pt")
 
-    stage2_results = {
-        "model": model_name, "stage": 2, "seed": seed,
-        "best_val_loss": best_val,
-        "history": history_s2,
-        "hyperparams": {
+    save_results(
+        results_dir / f"{tag}_stage2.json",
+        model_name=model_name, stage=2, seed=seed,
+        best_val=best_val, history=history_s2,
+        hyperparams={
             "prefix_len": prefix_len,
             "projection_lr": s2["projection_lr"], "lm_lr": s2["lm_lr"],
-            "epochs": s2["epochs"], "batch_size": cfg["batch_size"],
+            "max_epochs": s2["epochs"], "patience": args.patience,
+            "batch_size": cfg["batch_size"],
             "weight_decay": cfg["weight_decay"], "dropout": dropout,
             "proj_depth": args.proj_depth,
         },
-    }
-    with open(results_dir / f"{tag}_stage2.json", "w") as f:
-        json.dump(stage2_results, f, indent=2)
+    )
 
     print("Done. Results saved to", results_dir)
 
