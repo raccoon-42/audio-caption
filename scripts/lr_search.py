@@ -2,7 +2,6 @@
 
 import argparse
 import json
-from copy import deepcopy
 from pathlib import Path
 
 import optuna
@@ -127,7 +126,7 @@ def main():
 
     prefix_len = cfg["prefix_len"]
     dropout = cfg["dropout"]
-    lm_init_state = deepcopy(lm.state_dict())
+    lm_init_state = {k: v.cpu().clone() for k, v in lm.state_dict().items()}
 
     train_fn = TRAIN_FNS[args.model]
     eval_fn = EVAL_FNS[args.model]
