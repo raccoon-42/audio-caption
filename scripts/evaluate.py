@@ -17,6 +17,7 @@ from fense.evaluator import Evaluator
 from rouge_score import rouge_scorer
 from tqdm import tqdm
 from transformers import (
+    AutoModelForCausalLM,
     AutoTokenizer,
     ClapModel,
     ClapProcessor,
@@ -40,6 +41,8 @@ DEFAULT_MODEL_NAMES = {
     "gpt2": "gpt2",
     "t5": "t5-base",
     "opt": "facebook/opt-350m",
+    "phi2": "microsoft/phi-2",
+    "llama": "meta-llama/Llama-3.2-1B",
 }
 
 
@@ -59,6 +62,24 @@ def load_model(model_key, model_name, device):
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = OPTForCausalLM.from_pretrained(model_name, torch_dtype=torch.float32).to(device)
         lm_dim = model.config.word_embed_proj_dim
+        model_type = "decoder"
+    elif model_key == "phi2":
+        tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name, torch_dtype=torch.float32, trust_remote_code=True
+        ).to(device)
+        lm_dim = model.config.hidden_size
+        model_type = "decoder"
+    elif model_key == "llama":
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name, torch_dtype=torch.float32
+        ).to(device)
+        lm_dim = model.config.hidden_size
         model_type = "decoder"
     else:
         raise ValueError(f"Unknown model: {model_key}")
