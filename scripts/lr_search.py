@@ -155,7 +155,12 @@ def main():
             trial, epoch_offset=0, t_max=30,
         )
 
-        if s1_val <= trial.study.best_value if len(trial.study.trials) > 1 else True:
+        try:
+            is_best = s1_val <= trial.study.best_value
+        except ValueError:
+            is_best = True
+
+        if is_best:
             torch.save(projection.state_dict(), s1_proj_path)
             print(f"  New best S1 -- projection saved to {s1_proj_path}")
 
@@ -168,7 +173,7 @@ def main():
         storage=storage,
         load_if_exists=True,
     )
-    completed_s1 = len([t for t in s1_study.trials if t.state == optuna.trial.TrialState.COMPLETE])
+    completed_s1 = len([t for t in s1_study.trials if t.state in (optuna.trial.TrialState.COMPLETE, optuna.trial.TrialState.PRUNED)])
     remaining_s1 = max(0, args.n_trials - completed_s1)
     if remaining_s1 > 0:
         print(f"Resuming S1: {completed_s1} done, {remaining_s1} remaining")
@@ -241,7 +246,7 @@ def main():
         storage=storage,
         load_if_exists=True,
     )
-    completed_s2 = len([t for t in s2_study.trials if t.state == optuna.trial.TrialState.COMPLETE])
+    completed_s2 = len([t for t in s2_study.trials if t.state in (optuna.trial.TrialState.COMPLETE, optuna.trial.TrialState.PRUNED)])
     remaining_s2 = max(0, args.n_trials - completed_s2)
     if remaining_s2 > 0:
         print(f"Resuming S2: {completed_s2} done, {remaining_s2} remaining")
