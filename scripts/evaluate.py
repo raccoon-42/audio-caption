@@ -273,16 +273,17 @@ def main():
     print(f"Loading {model_name}...")
     model, tokenizer, lm_dim, model_type = load_model(args.model, model_name, device)
 
-    projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout, depth=args.proj_depth).to(device)
+    projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout, depth=args.proj_depth, use_layernorm=use_layernorm).to(device)
 
     ckpt_dir = Path(cfg["checkpoint_dir"]) / (args.ckpt_tag or args.model)
     load_checkpoints(args.model, model, projection, args.stage, ckpt_dir)
     projection.eval()
 
     ds = load_from_disk(str(data_dir))
-    split = ds.train_test_split(test_size=cfg["test_size"], seed=seed)
-    test_data = split["test"]
-    test_indices = split["test"]._indices.column("indices").to_pylist()
+    # 1. Split off test set (10%) - this matches dataset.py
+    split1 = ds.train_test_split(test_size=0.1, seed=seed)
+    test_data = split1["test"]
+    test_indices = test_data._indices.column("indices").to_pylist()
     test_clap = all_clap[test_indices]
 
     gen_kwargs = dict(
@@ -360,3 +361,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+__name__ == "__main__":
+    main()
+   main()

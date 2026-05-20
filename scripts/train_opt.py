@@ -107,7 +107,7 @@ def main():
     for p in model.parameters():
         p.requires_grad = False
 
-    train_loader, val_loader, audio_dim = load_dataloaders(cfg, tokenizer, seed=seed)
+    train_loader, val_loader, test_loader, audio_dim = load_dataloaders(cfg, tokenizer, seed=seed)
     lm_dim = model.config.word_embed_proj_dim
 
     projection = Projection(
@@ -149,7 +149,7 @@ def main():
             "max_epochs": s1["epochs"], "patience": args.patience,
             "batch_size": cfg["batch_size"],
             "weight_decay": cfg["weight_decay"], "dropout": dropout,
-            "proj_depth": args.proj_depth,
+            "proj_depth": args.proj_depth, "use_layernorm": use_layernorm,
         },
     )
 
@@ -194,7 +194,7 @@ def main():
             "max_epochs": s2["epochs"], "patience": args.patience,
             "batch_size": cfg["batch_size"],
             "weight_decay": cfg["weight_decay"], "dropout": dropout,
-            "proj_depth": args.proj_depth,
+            "proj_depth": args.proj_depth, "use_layernorm": use_layernorm,
         },
     )
 
@@ -203,3 +203,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+   main()

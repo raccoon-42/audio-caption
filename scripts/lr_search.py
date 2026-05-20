@@ -137,10 +137,11 @@ def main():
     print(f"Loading models for {args.model}...")
     lm, tokenizer, lm_dim = load_model(args.model, cfg, device)
 
-    train_loader, val_loader, audio_dim = load_dataloaders(cfg, tokenizer, seed=seed)
+    train_loader, val_loader, audio_dim = load_dataloaders(cfg, tokenizer, seed=seed, do_3way=False)
 
     prefix_len = cfg["prefix_len"]
     dropout = cfg["dropout"]
+    use_layernorm = args.use_layernorm or cfg.get("use_layernorm", False)
     lm_init_state = {k: v.cpu().clone() for k, v in lm.state_dict().items()}
 
     train_fn = TRAIN_FNS[args.model]
@@ -166,7 +167,7 @@ def main():
             print(f"  stage1_lr={s1_lr:.6g}  (range: [{lo:.1e}, {hi:.1e}])")
 
             set_seed(seed)
-            projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout).to(device)
+            projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout, use_layernorm=use_layernorm).to(device)
 
             lm.load_state_dict(lm_init_state)
             lm.eval()
@@ -226,7 +227,7 @@ def main():
         if not s1_proj_path.exists():
             print("Best S1 projection not on disk -- rerunning best trial to regenerate")
             set_seed(seed)
-            projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout).to(device)
+            projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout, use_layernorm=use_layernorm).to(device)
             lm.load_state_dict(lm_init_state)
             lm.eval()
             for p in lm.parameters():
@@ -267,7 +268,7 @@ def main():
             print(f"  stage2_lm_lr={s2_lm_lr:.6g}    (range: [{s2_lm_range[0]:.1e}, {s2_lm_range[1]:.1e}])")
 
             set_seed(seed)
-            projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout).to(device)
+            projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout, use_layernorm=use_layernorm).to(device)
             projection.load_state_dict(best_s1_projection_state)
 
             lm.load_state_dict(lm_init_state)
