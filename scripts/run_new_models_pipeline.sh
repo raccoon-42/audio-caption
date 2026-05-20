@@ -46,7 +46,7 @@ fi
 echo ""
 
 echo "===== LEARNING RATE SEARCH ====="
-for model in phi2 llama; do
+for model in llama; do
     echo "--- LR search: $model ---"
     if ! uv run python scripts/lr_search.py --model "$model"; then
         echo "LR SEARCH FAILED: $model"
@@ -56,12 +56,12 @@ for model in phi2 llama; do
 done
 
 echo "===== BASELINES ====="
-for model in phi2 llama; do
+for model in llama; do
     train_and_eval $model $model
 done
 
 echo "===== ARCHITECTURAL ABLATIONS ====="
-for model in phi2 llama; do
+for model in llama; do
     train_and_eval $model ${model}_prefix4 --prefix-len 4
     train_and_eval $model ${model}_prefix16 --prefix-len 16
 
@@ -77,8 +77,7 @@ if [ -n "$FAILED" ]; then
     exit 1
 else
     echo ""
-    echo "Phi-2 + LLaMA pipeline complete."
+    echo "LLaMA pipeline complete."
     echo ""
-    echo "NEXT STEP: Inspect results, pick best architecture per model, then run decoding ablations:"
-    echo "  CKPT_phi2=<best_tag> CKPT_llama=<best_tag> ./scripts/run_decoding_ablations.sh"
+    echo "NEXT STEP: Inspect results, pick best architecture per model, then run decoding ablations."
 fi

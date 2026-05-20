@@ -23,24 +23,22 @@ from projection import Projection
 from train_gpt2 import train_one_epoch as gpt2_train, evaluate as gpt2_eval
 from train_t5 import train_one_epoch as t5_train, evaluate as t5_eval
 from train_opt import train_one_epoch as opt_train, evaluate as opt_eval
-from train_phi2 import train_one_epoch as phi2_train, evaluate as phi2_eval
 from train_llama import train_one_epoch as llama_train, evaluate as llama_eval
 from utils import set_seed
 
 
 CONFIGS = {
     "gpt2": "configs/gpt2.yaml", "t5": "configs/t5.yaml", "opt": "configs/opt.yaml",
-    "phi2": "configs/phi2.yaml", "llama": "configs/llama.yaml",
+    "llama": "configs/llama.yaml",
 }
 
-TRAIN_FNS = {"gpt2": gpt2_train, "t5": t5_train, "opt": opt_train, "phi2": phi2_train, "llama": llama_train}
-EVAL_FNS = {"gpt2": gpt2_eval, "t5": t5_eval, "opt": opt_eval, "phi2": phi2_eval, "llama": llama_eval}
+TRAIN_FNS = {"gpt2": gpt2_train, "t5": t5_train, "opt": opt_train, "llama": llama_train}
+EVAL_FNS = {"gpt2": gpt2_eval, "t5": t5_eval, "opt": opt_eval, "llama": llama_eval}
 
 SEARCH_RANGES = {
     "gpt2":  {"s1_lr": (1e-4, 5e-2), "s2_proj_lr": (1e-5, 1e-3), "s2_lm_lr": (5e-6, 1e-2)},
     "t5":    {"s1_lr": (1e-2, 1e-1), "s2_proj_lr": (1e-5, 1e-3), "s2_lm_lr": (5e-6, 1e-2)},
     "opt":   {"s1_lr": (1e-5, 5e-3), "s2_proj_lr": (1e-5, 1e-3), "s2_lm_lr": (5e-6, 1e-2)},
-    "phi2":  {"s1_lr": (1e-5, 5e-3), "s2_proj_lr": (1e-5, 1e-3), "s2_lm_lr": (1e-7, 1e-4)},
     "llama": {"s1_lr": (1e-5, 5e-3), "s2_proj_lr": (1e-5, 1e-3), "s2_lm_lr": (1e-7, 1e-4)},
 }
 
@@ -61,15 +59,6 @@ def load_model(model_key, cfg, device):
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         lm = OPTForCausalLM.from_pretrained(model_name, torch_dtype=torch.float32).to(device)
         lm_dim = lm.config.word_embed_proj_dim
-    elif model_key == "phi2":
-        model_name = cfg["model_name"]
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        if tokenizer.pad_token is None:
-            tokenizer.pad_token = tokenizer.eos_token
-        lm = AutoModelForCausalLM.from_pretrained(
-            model_name, torch_dtype=torch.float32, trust_remote_code=True
-        ).to(device)
-        lm_dim = lm.config.hidden_size
     elif model_key == "llama":
         model_name = cfg["model_name"]
         tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -124,7 +113,7 @@ def run_stage(train_fn, eval_fn, projection, lm, train_loader, val_loader,
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", required=True, choices=["gpt2", "t5", "opt", "phi2", "llama"])
+    parser.add_argument("--model", required=True, choices=["gpt2", "t5", "opt", "llama"])
     parser.add_argument("--stage", choices=["s1", "s2", "both"], default="both")
     parser.add_argument("--n-trials", type=int, default=16)
     parser.add_argument("--epochs-per-stage", type=int, default=8)

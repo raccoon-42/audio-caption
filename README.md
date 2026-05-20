@@ -1,6 +1,6 @@
 # Audio Captioning: Language Model Ablation Study
 
-Systematic comparison of five language models for CLAP-based audio captioning on MusicCaps.
+Systematic comparison of four language models for CLAP-based audio captioning on MusicCaps.
 
 ## Models
 
@@ -9,7 +9,6 @@ Systematic comparison of five language models for CLAP-based audio captioning on
 | GPT-2 | Decoder-only | 124M |
 | T5-base | Encoder-decoder | 220M |
 | OPT-350M | Decoder-only | 350M |
-| Phi-2 | Decoder-only | 2.7B |
 | LLaMA-3.2-1B | Decoder-only | 1B |
 
 All models use a shared CLAP audio encoder (frozen) and a learned MLP projection layer. Training is two-stage: (1) projection only, (2) projection + LM fine-tuning.
@@ -20,7 +19,7 @@ All models use a shared CLAP audio encoder (frozen) and a learned MLP projection
 
 - Python 3.14+
 - [uv](https://docs.astral.sh/uv/) package manager
-- GPU with sufficient VRAM (batch_size=8 for GPT-2/T5/OPT, batch_size=4 for Phi-2/LLaMA)
+- GPU with sufficient VRAM (batch_size=8 for GPT-2/T5/OPT, batch_size=4 for LLaMA)
 
 ### 1. Install dependencies
 
@@ -45,7 +44,7 @@ For GPT-2, T5, and OPT:
 ./scripts/run_full_pipeline.sh
 ```
 
-For Phi-2 and LLaMA:
+For LLaMA:
 
 ```bash
 ./scripts/run_new_models_pipeline.sh
@@ -102,7 +101,6 @@ scripts/
   train_gpt2.py       Self-contained training scripts (one per model)
   train_t5.py
   train_opt.py
-  train_phi2.py
   train_llama.py
   lr_search.py         Optuna LR search for all models
   evaluate.py          Shared evaluation (metrics + generation)
@@ -112,7 +110,7 @@ scripts/
   trainer.py           Shared training loop + early stopping
   utils.py             Seed setting
   run_full_pipeline.sh          GPT-2 / T5 / OPT pipeline
-  run_new_models_pipeline.sh    Phi-2 / LLaMA pipeline
+  run_new_models_pipeline.sh    LLaMA pipeline
   run_decoding_ablations.sh     Decoding ablation sweeps
 data/                 Dataset and cached embeddings
 checkpoints/          Model checkpoints (per tag)
