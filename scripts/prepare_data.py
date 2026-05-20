@@ -8,8 +8,11 @@ import time
 import threading
 from pathlib import Path
 
-from datasets import load_dataset, Audio
+import librosa
+import torch
+from datasets import load_dataset, load_from_disk, Audio
 from tqdm import tqdm
+from transformers import ClapModel, ClapProcessor
 
 
 stats = {"ok": 0, "fail": 0, "skip": 0, "bytes": 0}
@@ -126,7 +129,13 @@ def main():
     parser.add_argument("--data-dir", type=str, default="data",
                         help="Root directory for all data artifacts")
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--precompute-clap", action="store_true",
+                        help="Only precompute CLAP embeddings (skip download)")
     args = parser.parse_args()
+
+    if args.precompute_clap:
+        precompute_clap(args.data_dir)
+        return
 
     data_dir = Path(args.data_dir).resolve()
     full_audio_dir = data_dir / "full_audio"
@@ -200,6 +209,49 @@ def main():
     ds_with_audio = ds_with_paths.cast_column("audio", Audio(sampling_rate=44100))
     ds_with_audio.save_to_disk(str(dataset_dir))
     print(f"Dataset saved to {dataset_dir} ({len(ds_with_audio)} samples)")
+
+
+def precompute_clap(data_dir):
+    data_dir = Path(data_dir)
+    dataset_dir = data_dir / "dataset"
+    out_path = data_dir / "clap_embeddings.pt"
+
+    ds = load_from_disk(str(dataset_dir))
+    print(f"Precomputing CLAP embeddings for {len(ds)} samples...")
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    processor = ClapProcessor.from_pretrained("laion/clap-htsat-unfused")
+    model = ClapModel.from_pretrained("laion/clap-htsat-unfused").to(device).eval()
+
+    embeddings = []
+    failed = 0
+    for i in tqdm(range(len(ds)), desc="CLAP embeddings"):
+        try:
+            sample = ds[i]
+            audio_array = sample["audio"]["array"]
+            sr = sample["audio"]["sampling_rate"]
+
+            if audio_array.ndim == 2:
+                audio_array = audio_array.mean(axis=1)
+            if sr != 48000:
+                audio_array = librosa.resample(audio_array, orig_sr=sr, target_sr=48000)
+
+            inputs = processor(audio=audio_array, sampling_rate=48000, return_tensors="pt")
+            with torch.no_grad():
+                out = model.get_audio_features(
+                    **{k: v.to(device) for k, v in inputs.items()}
+                )
+                emb = out if isinstance(out, torch.Tensor) else out.pooler_output
+            embeddings.append(emb.squeeze(0).cpu())
+        except Exception as e:
+            failed += 1
+            embeddings.append(torch.zeros(model.config.projection_dim))
+            if failed <= 5:
+                print(f"  Sample {i} failed: {e}")
+
+    embeddings = torch.stack(embeddings)
+    torch.save(embeddings, out_path)
+    print(f"Saved {embeddings.shape} to {out_path} ({failed} failed)")
 
 
 if __name__ == "__main__":

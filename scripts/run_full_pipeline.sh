@@ -1,5 +1,16 @@
 #!/bin/bash
 
+echo "===== PRECOMPUTE CLAP EMBEDDINGS ====="
+if [ -f "data/clap_embeddings.pt" ]; then
+    echo "SKIP: clap_embeddings.pt already exists"
+else
+    if ! uv run python scripts/prepare_data.py --precompute-clap; then
+        echo "CLAP precomputation failed"
+        exit 1
+    fi
+fi
+echo ""
+
 echo "===== LEARNING RATE SEARCH ====="
 for model in gpt2 t5 opt; do
     echo "--- LR search: $model ---"

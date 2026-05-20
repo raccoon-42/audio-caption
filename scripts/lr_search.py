@@ -8,13 +8,9 @@ from pathlib import Path
 import optuna
 import torch
 import yaml
-from datasets import load_from_disk
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import (
     AutoTokenizer,
-    ClapModel,
-    ClapProcessor,
     GPT2LMHeadModel,
     GPT2Tokenizer,
     OPTForCausalLM,
@@ -22,7 +18,7 @@ from transformers import (
     T5Tokenizer,
 )
 
-from dataset import MusicCapsDataset
+from dataset import load_dataloaders
 from projection import Projection
 from train_gpt2 import train_one_epoch as gpt2_train, evaluate as gpt2_eval
 from train_t5 import train_one_epoch as t5_train, evaluate as t5_eval
@@ -120,18 +116,7 @@ def main():
     print(f"Loading models for {args.model}...")
     lm, tokenizer, lm_dim = load_model(args.model, cfg, device)
 
-    clap_processor = ClapProcessor.from_pretrained("laion/clap-htsat-unfused")
-    clap_model = ClapModel.from_pretrained("laion/clap-htsat-unfused").to(device).eval()
-    for p in clap_model.parameters():
-        p.requires_grad = False
-    audio_dim = clap_model.config.projection_dim
-
-    ds = load_from_disk(cfg["data_dir"])
-    split = ds.train_test_split(test_size=cfg["test_size"], seed=seed)
-    train_ds = MusicCapsDataset(split["train"], tokenizer, clap_processor, clap_model, device)
-    val_ds = MusicCapsDataset(split["test"], tokenizer, clap_processor, clap_model, device)
-    train_loader = DataLoader(train_ds, batch_size=cfg["batch_size"], shuffle=True)
-    val_loader = DataLoader(val_ds, batch_size=cfg["batch_size"])
+    train_loader, val_loader, audio_dim = load_dataloaders(cfg, tokenizer, seed=seed)
 
     prefix_len = cfg["prefix_len"]
     dropout = cfg["dropout"]

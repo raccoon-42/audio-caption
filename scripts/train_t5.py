@@ -5,12 +5,10 @@ from pathlib import Path
 
 import torch
 import yaml
-from datasets import load_from_disk
-from torch.utils.data import DataLoader
 from tqdm import tqdm
-from transformers import ClapModel, ClapProcessor, T5ForConditionalGeneration, T5Tokenizer
+from transformers import T5ForConditionalGeneration, T5Tokenizer
 
-from dataset import MusicCapsDataset
+from dataset import load_dataloaders
 from projection import Projection
 from trainer import train_loop, save_results
 from utils import set_seed
@@ -101,29 +99,12 @@ def main():
     for p in t5.parameters():
         p.requires_grad = False
 
-    clap_processor = ClapProcessor.from_pretrained("laion/clap-htsat-unfused")
-    clap_model = ClapModel.from_pretrained("laion/clap-htsat-unfused").to(device).eval()
-    for p in clap_model.parameters():
-        p.requires_grad = False
-
-    audio_dim = clap_model.config.projection_dim
+    train_loader, val_loader, audio_dim = load_dataloaders(cfg, tokenizer, seed=seed)
     lm_dim = t5.config.d_model
 
     projection = Projection(
         audio_dim, lm_dim, prefix_len, dropout=dropout, depth=args.proj_depth
     ).to(device)
-
-    # -- dataset --
-    ds = load_from_disk(cfg["data_dir"])
-    split = ds.train_test_split(test_size=cfg["test_size"], seed=seed)
-    train_ds = MusicCapsDataset(
-        split["train"], tokenizer, clap_processor, clap_model, device
-    )
-    val_ds = MusicCapsDataset(
-        split["test"], tokenizer, clap_processor, clap_model, device
-    )
-    train_loader = DataLoader(train_ds, batch_size=cfg["batch_size"], shuffle=True)
-    val_loader = DataLoader(val_ds, batch_size=cfg["batch_size"])
 
     tag = args.ablation_tag or "t5"
     ckpt_dir = Path(cfg["checkpoint_dir"]) / tag

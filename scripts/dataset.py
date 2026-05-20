@@ -1,51 +1,25 @@
-import librosa
+from pathlib import Path
+
 import torch
-from torch.utils.data import Dataset
+from datasets import load_from_disk
+from torch.utils.data import Dataset, DataLoader
 
 
 class MusicCapsDataset(Dataset):
-    def __init__(self, hf_dataset, tokenizer, clap_processor, clap_model, device,
-                 max_len=64):
+    def __init__(self, hf_dataset, tokenizer, clap_embeddings, max_len=64):
         self.data = hf_dataset
         self.tokenizer = tokenizer
-        self.clap_processor = clap_processor
-        self.clap_model = clap_model
-        self.device = device
+        self.clap_embeddings = clap_embeddings
         self.max_len = max_len
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        for i in range(idx, idx + 10):
-            try:
-                return self._load(i % len(self.data))
-            except Exception:
-                continue
-        return self._load(0)
-
-    def _load(self, idx):
-        sample = self.data[idx]
-        audio_array = sample["audio"]["array"]
-        sr = sample["audio"]["sampling_rate"]
-
-        if audio_array.ndim == 2:
-            audio_array = audio_array.mean(axis=1)
-        if sr != 48000:
-            audio_array = librosa.resample(audio_array, orig_sr=sr, target_sr=48000)
-
-        inputs = self.clap_processor(
-            audio=audio_array, sampling_rate=48000, return_tensors="pt"
-        )
-        with torch.no_grad():
-            out = self.clap_model.get_audio_features(
-                **{k: v.to(self.device) for k, v in inputs.items()}
-            )
-            audio_emb = out if isinstance(out, torch.Tensor) else out.pooler_output
-        audio_emb = audio_emb.squeeze(0).cpu()
+        audio_emb = self.clap_embeddings[idx]
 
         tokens = self.tokenizer(
-            sample["caption"],
+            self.data[idx]["caption"],
             max_length=self.max_len,
             padding="max_length",
             truncation=True,
@@ -55,3 +29,28 @@ class MusicCapsDataset(Dataset):
         attention_mask = tokens.attention_mask.squeeze(0)
 
         return audio_emb, input_ids, attention_mask
+
+
+def load_dataloaders(cfg, tokenizer, batch_size=None, seed=None):
+    data_dir = Path(cfg["data_dir"])
+    all_clap = torch.load(data_dir.parent / "clap_embeddings.pt", weights_only=True)
+    audio_dim = all_clap.shape[1]
+
+    ds = load_from_disk(str(data_dir))
+    seed = seed or cfg["seed"]
+    split = ds.train_test_split(test_size=cfg["test_size"], seed=seed)
+
+    train_indices = split["train"]._indices.column("indices").to_pylist()
+    val_indices = split["test"]._indices.column("indices").to_pylist()
+
+    bs = batch_size or cfg["batch_size"]
+    train_loader = DataLoader(
+        MusicCapsDataset(split["train"], tokenizer, all_clap[train_indices]),
+        batch_size=bs, shuffle=True,
+    )
+    val_loader = DataLoader(
+        MusicCapsDataset(split["test"], tokenizer, all_clap[val_indices]),
+        batch_size=bs,
+    )
+
+    return train_loader, val_loader, audio_dim
