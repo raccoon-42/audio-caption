@@ -140,7 +140,7 @@ def main():
         stage_label="S1",
         ckpt_paths={"proj": (projection.state_dict, ckpt_dir / "stage1_best.pt")},
         device=device,
-        t_max=30,
+        t_max=s1["epochs"],
     )
     torch.save(projection.state_dict(), ckpt_dir / "stage1_last.pt")
 
@@ -183,7 +183,7 @@ def main():
             "lm": (model.state_dict, ckpt_dir / "stage2_llama_best.pt"),
         },
         device=device,
-        t_max=20,
+        t_max=s2["epochs"],
     )
     torch.save(projection.state_dict(), ckpt_dir / "stage2_proj_last.pt")
     torch.save(model.state_dict(), ckpt_dir / "stage2_llama_last.pt")
