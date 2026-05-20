@@ -128,7 +128,7 @@ def main():
     parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args()
 
-    data_dir = Path(args.data_dir)
+    data_dir = Path(args.data_dir).resolve()
     full_audio_dir = data_dir / "full_audio"
     segments_dir = data_dir / "segments"
     dataset_dir = data_dir / "dataset"
