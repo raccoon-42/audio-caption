@@ -1,10 +1,17 @@
 #!/bin/bash
+# Usage: ./scripts/run_3_arch_ablations.sh gpt2 t5 opt llama
 
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
 
 EVAL="uv run python scripts/evaluate.py --stage 2"
 FAILED=""
+
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 <model1> [model2] ..."
+    echo "Models: gpt2, t5, opt, llama"
+    exit 1
+fi
 
 train_and_eval() {
     local model=$1 tag=$2
@@ -34,34 +41,9 @@ train_and_eval() {
     echo ""
 }
 
-echo "===== PRECOMPUTE CLAP EMBEDDINGS ====="
-if [ -f "data/clap_embeddings.pt" ]; then
-    echo "SKIP: clap_embeddings.pt already exists"
-else
-    if ! uv run python scripts/prepare_data.py --precompute-clap; then
-        echo "CLAP precomputation failed"
-        exit 1
-    fi
-fi
-echo ""
+for model in "$@"; do
+    echo "===== Arch ablations: $model ====="
 
-echo "===== LEARNING RATE SEARCH ====="
-for model in llama; do
-    echo "--- LR search: $model ---"
-    if ! uv run python scripts/lr_search.py --model "$model"; then
-        echo "LR SEARCH FAILED: $model"
-        exit 1
-    fi
-    echo ""
-done
-
-echo "===== BASELINES ====="
-for model in llama; do
-    train_and_eval $model $model
-done
-
-echo "===== ARCHITECTURAL ABLATIONS ====="
-for model in llama; do
     train_and_eval $model ${model}_prefix4 --prefix-len 4
     train_and_eval $model ${model}_prefix16 --prefix-len 16
 
@@ -73,11 +55,8 @@ for model in llama; do
 done
 
 if [ -n "$FAILED" ]; then
-    echo "FAILED RUNS:$FAILED"
+    echo "FAILED:$FAILED"
     exit 1
 else
-    echo ""
-    echo "LLaMA pipeline complete."
-    echo ""
-    echo "NEXT STEP: Inspect results, pick best architecture per model, then run decoding ablations."
+    echo "All arch ablations complete."
 fi
