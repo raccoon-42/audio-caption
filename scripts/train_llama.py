@@ -125,7 +125,7 @@ def main():
     results_dir.mkdir(parents=True, exist_ok=True)
 
     # ========== STAGE 1: projection only ==========
-    print(f"=== Stage 1: training projection ({model_name} frozen) ===")
+    print(f"=== Stage 1: training projection ({tag} / {model_name} frozen) ===")
     s1 = cfg["stage1"]
     optimizer = torch.optim.AdamW(
         projection.parameters(), lr=s1["lr"], weight_decay=cfg["weight_decay"]
@@ -158,7 +158,7 @@ def main():
     )
 
     # ========== STAGE 2: projection + LLaMA fine-tune ==========
-    print(f"=== Stage 2: fine-tuning projection + {model_name} ===")
+    print(f"=== Stage 2: fine-tuning projection + {tag} / {model_name} ===")
     projection.load_state_dict(torch.load(ckpt_dir / "stage1_best.pt", weights_only=True))
 
     for p in model.parameters():

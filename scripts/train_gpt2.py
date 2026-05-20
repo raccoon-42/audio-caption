@@ -124,7 +124,7 @@ def main():
     results_dir.mkdir(parents=True, exist_ok=True)
 
     # ========== STAGE 1: projection only ==========
-    print("=== Stage 1: training projection (GPT-2 frozen) ===")
+    print(f"=== Stage 1: training projection ({tag} / GPT-2 frozen) ===")
     s1 = cfg["stage1"]
     optimizer = torch.optim.AdamW(
         projection.parameters(), lr=s1["lr"], weight_decay=cfg["weight_decay"]
@@ -157,7 +157,7 @@ def main():
     )
 
     # ========== STAGE 2: projection + GPT-2 fine-tune ==========
-    print("=== Stage 2: fine-tuning projection + GPT-2 ===")
+    print(f"=== Stage 2: fine-tuning projection + {tag} / GPT-2 ===")
     projection.load_state_dict(torch.load(ckpt_dir / "stage1_best.pt", weights_only=True))
 
     for p in gpt2.parameters():
