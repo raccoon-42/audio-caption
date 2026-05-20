@@ -53,6 +53,7 @@ data/
 
 # Results
 results/
+*.db
 
 *.exe
 *.deb

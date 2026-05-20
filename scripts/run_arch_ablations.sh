@@ -6,6 +6,14 @@ FAILED=""
 train_and_eval() {
     local model=$1 tag=$2
     shift 2
+
+    local result_file="results/${model}/${model}_ablation_${tag}.json"
+
+    if [ -f "$result_file" ]; then
+        echo "SKIP: $tag (already done: $result_file)"
+        return
+    fi
+
     echo "=========================================="
     echo "TRAINING: $tag"
     echo "=========================================="

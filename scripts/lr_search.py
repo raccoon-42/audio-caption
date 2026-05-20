@@ -98,14 +98,20 @@ def run_stage(train_fn, eval_fn, projection, lm, train_loader, val_loader,
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True, choices=["gpt2", "t5", "opt"])
-    parser.add_argument("--n-trials", type=int, default=15)
-    parser.add_argument("--epochs-per-stage", type=int, default=10)
+    parser.add_argument("--n-trials", type=int, default=8)
+    parser.add_argument("--epochs-per-stage", type=int, default=5)
     parser.add_argument("--patience", type=int, default=3)
     args = parser.parse_args()
 
     config_path = CONFIGS[args.model]
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
+
+    db_dir = Path(cfg.get("results_dir", "results")) / args.model
+    db_dir.mkdir(parents=True, exist_ok=True)
+    db_path = db_dir / f"{args.model}_lr_search.db"
+    storage = f"sqlite:///{db_path}"
+    print(f"Optuna DB: {db_path}")
 
     seed = cfg["seed"]
     set_seed(seed)
@@ -139,10 +145,9 @@ def main():
     print("Stage 1 LR search")
     print(f"{'='*50}")
 
-    best_s1_projection_state = None
+    s1_proj_path = db_dir / f"{args.model}_s1_best_proj.pt"
 
     def s1_objective(trial):
-        nonlocal best_s1_projection_state
         s1_lr = trial.suggest_float("stage1_lr", 1e-5, 1e-2, log=True)
 
         print(f"\n--- S1 Trial {trial.number} ---")
@@ -165,8 +170,9 @@ def main():
             trial, epoch_offset=0, t_max=30,
         )
 
-        if best_s1_projection_state is None or s1_val < trial.study.best_value:
-            best_s1_projection_state = deepcopy(projection.state_dict())
+        if s1_val <= trial.study.best_value if len(trial.study.trials) > 1 else True:
+            torch.save(projection.state_dict(), s1_proj_path)
+            print(f"  New best S1 -- projection saved to {s1_proj_path}")
 
         return s1_val
 
@@ -174,18 +180,45 @@ def main():
         direction="minimize",
         pruner=optuna.pruners.MedianPruner(n_startup_trials=3, n_warmup_steps=5),
         study_name=f"lr_search_{args.model}_s1",
+        storage=storage,
+        load_if_exists=True,
     )
-    s1_study.optimize(s1_objective, n_trials=args.n_trials)
+    completed_s1 = len([t for t in s1_study.trials if t.state == optuna.trial.TrialState.COMPLETE])
+    remaining_s1 = max(0, args.n_trials - completed_s1)
+    if remaining_s1 > 0:
+        print(f"Resuming S1: {completed_s1} done, {remaining_s1} remaining")
+        s1_study.optimize(s1_objective, n_trials=remaining_s1)
+    else:
+        print(f"S1 already complete ({completed_s1} trials)")
 
     best_s1 = s1_study.best_trial
     best_s1_lr = best_s1.params["stage1_lr"]
     print(f"\nBest S1 trial #{best_s1.number} (val_loss={best_s1.value:.4f}):")
     print(f"  stage1_lr: {best_s1_lr:.6g}")
 
+    if not s1_proj_path.exists():
+        print("Best S1 projection not on disk -- rerunning best trial to regenerate")
+        set_seed(seed)
+        projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout).to(device)
+        lm.load_state_dict(lm_init_state)
+        lm.eval()
+        for p in lm.parameters():
+            p.requires_grad = False
+        optimizer = torch.optim.AdamW(
+            projection.parameters(), lr=best_s1_lr, weight_decay=cfg["weight_decay"]
+        )
+        dummy_trial = s1_study.ask()
+        run_stage(train_fn, eval_fn, projection, lm, train_loader, val_loader,
+                  optimizer, prefix_len, device, args.epochs_per_stage, args.patience,
+                  dummy_trial, epoch_offset=0, t_max=30)
+        torch.save(projection.state_dict(), s1_proj_path)
+
     # ---- Stage 2 search: find best S2 LRs using best S1 projection ----
     print(f"\n{'='*50}")
     print("Stage 2 LR search (using best S1 projection)")
     print(f"{'='*50}")
+
+    best_s1_projection_state = torch.load(s1_proj_path, weights_only=True, map_location=device)
 
     def s2_objective(trial):
         s2_proj_lr = trial.suggest_float("stage2_proj_lr", 1e-5, 1e-3, log=True)
@@ -220,8 +253,16 @@ def main():
         direction="minimize",
         pruner=optuna.pruners.MedianPruner(n_startup_trials=3, n_warmup_steps=5),
         study_name=f"lr_search_{args.model}_s2",
+        storage=storage,
+        load_if_exists=True,
     )
-    s2_study.optimize(s2_objective, n_trials=args.n_trials)
+    completed_s2 = len([t for t in s2_study.trials if t.state == optuna.trial.TrialState.COMPLETE])
+    remaining_s2 = max(0, args.n_trials - completed_s2)
+    if remaining_s2 > 0:
+        print(f"Resuming S2: {completed_s2} done, {remaining_s2} remaining")
+        s2_study.optimize(s2_objective, n_trials=remaining_s2)
+    else:
+        print(f"S2 already complete ({completed_s2} trials)")
 
     best_s2 = s2_study.best_trial
     print(f"\nBest S2 trial #{best_s2.number} (val_loss={best_s2.value:.4f}):")
