@@ -1,147 +1,128 @@
-# Audio Caption Framework
+# Audio Captioning: Language Model Ablation Study
 
-A modular framework for audio-to-text captioning with easy model swapping capabilities.
+Systematic comparison of five language models for CLAP-based audio captioning on MusicCaps.
 
-## Features
+## Models
 
-- **Plugin Architecture**: Easily swap audio encoders, language models, and projection layers
-- **Model Registry**: Simple registration system for adding new models
-- **Configuration-Based**: YAML configuration files for easy experimentation
-- **Modular Design**: Clean separation of concerns
+| Model | Type | Parameters |
+|-------|------|-----------|
+| GPT-2 | Decoder-only | 124M |
+| T5-base | Encoder-decoder | 220M |
+| OPT-350M | Decoder-only | 350M |
+| Phi-2 | Decoder-only | 2.7B |
+| LLaMA-3.2-1B | Decoder-only | 1B |
 
-## Installation
+All models use a shared CLAP audio encoder (frozen) and a learned MLP projection layer. Training is two-stage: (1) projection only, (2) projection + LM fine-tuning.
+
+## Reproducing Results
+
+### Prerequisites
+
+- Python 3.14+
+- [uv](https://docs.astral.sh/uv/) package manager
+- GPU with sufficient VRAM (batch_size=8 for GPT-2/T5/OPT, batch_size=4 for Phi-2/LLaMA)
+
+### 1. Install dependencies
 
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
-## Quick Start
+### 2. Prepare data
 
-1. Prepare your dataset (should be saved with `datasets.save_to_disk()`)
-
-2. Create a configuration file (see `configs/default.yaml` for example)
-
-3. Train the model:
+Download and preprocess MusicCaps, then precompute CLAP embeddings:
 
 ```bash
-# With GPT-2
-python scripts/train.py \
-    --config configs/default.yaml \
-    --dataset path/to/your/dataset
-
-# With T5
-python scripts/train.py \
-    --config configs/t5.yaml \
-    --dataset path/to/your/dataset
+uv run python scripts/prepare_data.py
+uv run python scripts/prepare_data.py --precompute-clap
 ```
+
+### 3. Run the full pipeline
+
+For GPT-2, T5, and OPT:
+
+```bash
+./scripts/run_full_pipeline.sh
+```
+
+For Phi-2 and LLaMA:
+
+```bash
+./scripts/run_new_models_pipeline.sh
+```
+
+Each pipeline runs: CLAP precomputation (if needed) -> LR search -> baseline training -> architectural ablations.
+
+### 4. Decoding ablations
+
+After training, run decoding ablations on the best checkpoint per model:
+
+```bash
+CKPT_gpt2=<best_tag> CKPT_t5=<best_tag> CKPT_opt=<best_tag> ./scripts/run_decoding_ablations.sh
+```
+
+### 5. Evaluate a single model
+
+```bash
+uv run python scripts/evaluate.py --model gpt2 --stage 2
+```
+
+## Pipeline Steps
+
+| Step | Script | Description |
+|------|--------|-------------|
+| Data prep | `scripts/prepare_data.py` | Downloads MusicCaps, extracts audio, saves HF dataset |
+| CLAP embeddings | `scripts/prepare_data.py --precompute-clap` | Caches CLAP audio embeddings to `data/clap_embeddings.pt` |
+| LR search | `scripts/lr_search.py --model <name>` | Optuna-based hyperparameter search per model |
+| Training | `scripts/train_<model>.py` | Per-model training (stage 1 + stage 2) |
+| Evaluation | `scripts/evaluate.py` | Generates captions and computes metrics |
+
+## Ablations
+
+**Architectural** (varied per model):
+- Prefix length: 4, 8, 16
+- Dropout: 0.1, 0.3, 0.5
+- Projection depth: 1, 2, 3
+
+**Decoding** (applied to best checkpoint):
+- Repetition penalty
+- Beam search + length penalty
+- N-gram blocking
+- Nucleus sampling (top-p)
+
+## Metrics
+
+BLEU-1, BLEU-4, METEOR, ROUGE-L, CIDEr, FENSE
 
 ## Project Structure
 
 ```
-audiocaption/
-├── core/              # Base classes and registry
-├── models/            # Model implementations
-│   ├── audio_encoders/
-│   ├── language_models/
-│   └── projections/
-├── data/              # Dataset loading
-├── training/          # Training pipeline
-└── utils/             # Utilities
-
+configs/              Per-model YAML configs (hyperparams, paths)
 scripts/
-└── train.py           # Training script
-
-configs/
-└── default.yaml       # Example configuration
+  train_gpt2.py       Self-contained training scripts (one per model)
+  train_t5.py
+  train_opt.py
+  train_phi2.py
+  train_llama.py
+  lr_search.py         Optuna LR search for all models
+  evaluate.py          Shared evaluation (metrics + generation)
+  prepare_data.py      Data download and CLAP precomputation
+  dataset.py           Dataloader with CLAP caching
+  projection.py        Shared MLP projection module
+  trainer.py           Shared training loop + early stopping
+  utils.py             Seed setting
+  run_full_pipeline.sh          GPT-2 / T5 / OPT pipeline
+  run_new_models_pipeline.sh    Phi-2 / LLaMA pipeline
+  run_decoding_ablations.sh     Decoding ablation sweeps
+data/                 Dataset and cached embeddings
+checkpoints/          Model checkpoints (per tag)
+results/              JSON results (per model, per ablation)
 ```
 
-## Adding New Models
+## Reproducibility
 
-### Adding a New Audio Encoder
-
-```python
-from audiocaption.core.base import AudioEncoder
-from audiocaption.core.registry import ModelRegistry
-
-@ModelRegistry.register_audio_encoder("my_encoder")
-class MyAudioEncoder(AudioEncoder):
-    def __init__(self, config):
-        super().__init__(config)
-        # Initialize your model
-    
-    def get_embedding_dim(self):
-        return 512  # Your embedding dimension
-    
-    def encode_audio(self, audio):
-        # Your encoding logic
-        return embeddings
-```
-
-### Adding a New Language Model
-
-```python
-from audiocaption.core.base import LanguageModel
-from audiocaption.core.registry import ModelRegistry
-
-@ModelRegistry.register_language_model("my_lm")
-class MyLanguageModel(LanguageModel):
-    def __init__(self, config):
-        super().__init__(config)
-        # Initialize your model
-    
-    def get_embedding_dim(self):
-        return 768  # Your embedding dimension
-    
-    def get_tokenizer(self):
-        return self.tokenizer
-    
-    def forward_with_prefix(self, prefix_embeddings, text_embeddings, labels=None):
-        # Your forward logic
-        return {"loss": loss}
-```
-
-### Adding a New Projection
-
-```python
-from audiocaption.core.base import Projection
-from audiocaption.core.registry import ModelRegistry
-
-@ModelRegistry.register_projection("my_projection")
-class MyProjection(Projection):
-    def __init__(self, config):
-        super().__init__(config)
-        # Initialize your projection
-    
-    def forward(self, audio_embeddings):
-        # Your projection logic
-        return projected_embeddings
-    
-    def get_output_shape(self, prefix_len, lm_embedding_dim):
-        return (prefix_len, lm_embedding_dim)
-```
-
-## Configuration
-
-Configuration files are YAML format. See `configs/default.yaml` for an example.
-
-Key sections:
-- `audio_encoder`: Audio encoder configuration
-- `language_model`: Language model configuration  
-- `projection`: Projection layer configuration
-- `training`: Training hyperparameters
-
-## Available Models
-
-### Audio Encoders
-- `clap`: CLAP (Contrastive Language-Audio Pretraining)
-
-### Language Models
-- `gpt2`: GPT-2
-- `t5`: T5 (Text-to-Text Transfer Transformer) - supports t5-small, t5-base, t5-large, etc.
-
-### Projections
-- `sequential`: Sequential layers with configurable architecture
-
-## License
-
-MIT
+- All experiments use `seed: 42`
+- Learning rates are tuned per model via Optuna (results cached, not re-run if found)
+- Pipeline scripts skip already-completed runs (checks for result JSON files)
+- Per-epoch loss history is saved in all result JSONs
+- Set `HF_HUB_OFFLINE=1` and `TRANSFORMERS_OFFLINE=1` if running without internet
