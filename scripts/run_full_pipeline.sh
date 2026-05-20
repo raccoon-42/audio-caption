@@ -21,4 +21,10 @@ if [ $ARCH_EXIT -ne 0 ]; then
     exit 1
 else
     echo "Full pipeline complete."
+    echo ""
+    echo "NEXT STEP: Inspect results, pick best architecture per model, then run:"
+    echo "  CKPT_gpt2=<best_tag> CKPT_t5=<best_tag> CKPT_opt=<best_tag> ./scripts/run_decoding_ablations.sh"
+    echo ""
+    echo "Example:"
+    echo "  CKPT_gpt2=gpt2_prefix4 CKPT_t5=t5 CKPT_opt=opt_depth3 ./scripts/run_decoding_ablations.sh"
 fi
