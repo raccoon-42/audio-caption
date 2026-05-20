@@ -134,16 +134,21 @@ def main():
     train_fn = TRAIN_FNS[args.model]
     eval_fn = EVAL_FNS[args.model]
 
-    def objective(trial):
-        s1_lr = trial.suggest_float("stage1_lr", 1e-5, 1e-2, log=True)
-        s2_proj_lr = trial.suggest_float("stage2_proj_lr", 1e-5, 1e-3, log=True)
-        s2_lm_lr = trial.suggest_float("stage2_lm_lr", 1e-7, 1e-4, log=True)
+    # ---- Stage 1 search: find best S1 LR ----
+    print(f"\n{'='*50}")
+    print("Stage 1 LR search")
+    print(f"{'='*50}")
 
-        print(f"\n--- Trial {trial.number} ---")
-        print(f"  stage1_lr={s1_lr:.6g}  stage2_proj_lr={s2_proj_lr:.6g}  stage2_lm_lr={s2_lm_lr:.6g}")
+    best_s1_projection_state = None
+
+    def s1_objective(trial):
+        nonlocal best_s1_projection_state
+        s1_lr = trial.suggest_float("stage1_lr", 1e-5, 1e-2, log=True)
+
+        print(f"\n--- S1 Trial {trial.number} ---")
+        print(f"  stage1_lr={s1_lr:.6g}")
 
         set_seed(seed)
-
         projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout).to(device)
 
         lm.load_state_dict(lm_init_state)
@@ -151,7 +156,6 @@ def main():
         for p in lm.parameters():
             p.requires_grad = False
 
-        # Stage 1
         optimizer = torch.optim.AdamW(
             projection.parameters(), lr=s1_lr, weight_decay=cfg["weight_decay"]
         )
@@ -161,7 +165,40 @@ def main():
             trial, epoch_offset=0, t_max=30,
         )
 
-        # Stage 2
+        if best_s1_projection_state is None or s1_val < trial.study.best_value:
+            best_s1_projection_state = deepcopy(projection.state_dict())
+
+        return s1_val
+
+    s1_study = optuna.create_study(
+        direction="minimize",
+        pruner=optuna.pruners.MedianPruner(n_startup_trials=3, n_warmup_steps=5),
+        study_name=f"lr_search_{args.model}_s1",
+    )
+    s1_study.optimize(s1_objective, n_trials=args.n_trials)
+
+    best_s1 = s1_study.best_trial
+    best_s1_lr = best_s1.params["stage1_lr"]
+    print(f"\nBest S1 trial #{best_s1.number} (val_loss={best_s1.value:.4f}):")
+    print(f"  stage1_lr: {best_s1_lr:.6g}")
+
+    # ---- Stage 2 search: find best S2 LRs using best S1 projection ----
+    print(f"\n{'='*50}")
+    print("Stage 2 LR search (using best S1 projection)")
+    print(f"{'='*50}")
+
+    def s2_objective(trial):
+        s2_proj_lr = trial.suggest_float("stage2_proj_lr", 1e-5, 1e-3, log=True)
+        s2_lm_lr = trial.suggest_float("stage2_lm_lr", 1e-7, 1e-4, log=True)
+
+        print(f"\n--- S2 Trial {trial.number} ---")
+        print(f"  stage2_proj_lr={s2_proj_lr:.6g}  stage2_lm_lr={s2_lm_lr:.6g}")
+
+        set_seed(seed)
+        projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout).to(device)
+        projection.load_state_dict(best_s1_projection_state)
+
+        lm.load_state_dict(lm_init_state)
         for p in lm.parameters():
             p.requires_grad = True
         lm.train()
@@ -174,52 +211,63 @@ def main():
         s2_val = run_stage(
             train_fn, eval_fn, projection, lm, train_loader, val_loader,
             optimizer, prefix_len, device, args.epochs_per_stage, args.patience,
-            trial, epoch_offset=args.epochs_per_stage, t_max=20,
+            trial, epoch_offset=0, t_max=20,
         )
 
         return s2_val
 
-    study = optuna.create_study(
+    s2_study = optuna.create_study(
         direction="minimize",
         pruner=optuna.pruners.MedianPruner(n_startup_trials=3, n_warmup_steps=5),
-        study_name=f"lr_search_{args.model}",
+        study_name=f"lr_search_{args.model}_s2",
     )
-    study.optimize(objective, n_trials=args.n_trials)
+    s2_study.optimize(s2_objective, n_trials=args.n_trials)
 
-    best = study.best_trial
+    best_s2 = s2_study.best_trial
+    print(f"\nBest S2 trial #{best_s2.number} (val_loss={best_s2.value:.4f}):")
+    print(f"  stage2_proj_lr: {best_s2.params['stage2_proj_lr']:.6g}")
+    print(f"  stage2_lm_lr:  {best_s2.params['stage2_lm_lr']:.6g}")
+
+    # ---- Save results ----
     print(f"\n{'='*50}")
-    print(f"Best trial #{best.number} (val_loss={best.value:.4f}):")
-    print(f"  stage1_lr:     {best.params['stage1_lr']:.6g}")
-    print(f"  stage2_proj_lr: {best.params['stage2_proj_lr']:.6g}")
-    print(f"  stage2_lm_lr:  {best.params['stage2_lm_lr']:.6g}")
+    print("Final best LRs:")
+    print(f"  stage1_lr:      {best_s1_lr:.6g}")
+    print(f"  stage2_proj_lr: {best_s2.params['stage2_proj_lr']:.6g}")
+    print(f"  stage2_lm_lr:   {best_s2.params['stage2_lm_lr']:.6g}")
 
     results_dir = Path(cfg["results_dir"]) / args.model
     results_dir.mkdir(parents=True, exist_ok=True)
     results = {
         "model": args.model,
-        "best_trial": best.number,
-        "best_val_loss": best.value,
-        "best_params": best.params,
         "n_trials": args.n_trials,
         "epochs_per_stage": args.epochs_per_stage,
-        "all_trials": [
-            {
-                "number": t.number,
-                "value": t.value if t.value is not None else None,
-                "params": t.params,
-                "state": str(t.state),
-            }
-            for t in study.trials
-        ],
+        "stage1": {
+            "best_trial": best_s1.number,
+            "best_val_loss": best_s1.value,
+            "best_lr": best_s1_lr,
+            "all_trials": [
+                {"number": t.number, "value": t.value, "params": t.params, "state": str(t.state)}
+                for t in s1_study.trials
+            ],
+        },
+        "stage2": {
+            "best_trial": best_s2.number,
+            "best_val_loss": best_s2.value,
+            "best_params": best_s2.params,
+            "all_trials": [
+                {"number": t.number, "value": t.value, "params": t.params, "state": str(t.state)}
+                for t in s2_study.trials
+            ],
+        },
     }
     out_path = results_dir / f"{args.model}_lr_search.json"
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
     print(f"Results saved to {out_path}")
 
-    cfg["stage1"]["lr"] = float(best.params["stage1_lr"])
-    cfg["stage2"]["projection_lr"] = float(best.params["stage2_proj_lr"])
-    cfg["stage2"]["lm_lr"] = float(best.params["stage2_lm_lr"])
+    cfg["stage1"]["lr"] = float(best_s1_lr)
+    cfg["stage2"]["projection_lr"] = float(best_s2.params["stage2_proj_lr"])
+    cfg["stage2"]["lm_lr"] = float(best_s2.params["stage2_lm_lr"])
     with open(config_path, "w") as f:
         yaml.dump(cfg, f, default_flow_style=False, sort_keys=False)
     print(f"Updated {config_path} with best LRs")
