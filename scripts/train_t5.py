@@ -78,6 +78,7 @@ def main():
     parser.add_argument("--proj-depth", type=int, default=2)
     parser.add_argument("--patience", type=int, default=5)
     parser.add_argument("--ablation-tag", type=str, default=None)
+    parser.add_argument("--use-layernorm", action="store_true")
     args = parser.parse_args()
 
     with open(args.config) as f:
@@ -85,6 +86,7 @@ def main():
 
     prefix_len = args.prefix_len or cfg["prefix_len"]
     dropout = args.dropout if args.dropout is not None else cfg["dropout"]
+    use_layernorm = args.use_layernorm or cfg.get("use_layernorm", False)
 
     seed = cfg["seed"]
     set_seed(seed)
@@ -195,4 +197,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-   main()
