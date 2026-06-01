@@ -2,6 +2,7 @@ seed: 42
 prefix_len: 8
 batch_size: 8
 dropout: 0.3
+use_layernorm: true
 weight_decay: 0.1
 test_size: 0.1
 model_name: t5-base

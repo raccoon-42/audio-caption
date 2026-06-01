@@ -118,7 +118,12 @@ def main():
     parser.add_argument("--n-trials", type=int, default=16)
     parser.add_argument("--epochs-per-stage", type=int, default=8)
     parser.add_argument("--patience", type=int, default=3)
+    parser.add_argument("--use-layernorm", action="store_true")
+    parser.add_argument("--proj-depth", type=int, default=2)
     args = parser.parse_args()
+
+    proj_depth = args.proj_depth
+    tag = args.model if proj_depth == 2 else f"{args.model}_depth{proj_depth}"
 
     config_path = CONFIGS[args.model]
     with open(config_path) as f:
@@ -126,7 +131,7 @@ def main():
 
     db_dir = Path(cfg.get("results_dir", "results")) / args.model
     db_dir.mkdir(parents=True, exist_ok=True)
-    db_path = db_dir / f"{args.model}_lr_search.db"
+    db_path = db_dir / f"{tag}_lr_search.db"
     storage = f"sqlite:///{db_path}"
     print(f"Optuna DB: {db_path}")
 
@@ -148,7 +153,7 @@ def main():
     eval_fn = EVAL_FNS[args.model]
 
     # ---- Stage 1 search: find best S1 LR ----
-    s1_proj_path = db_dir / f"{args.model}_s1_best_proj.pt"
+    s1_proj_path = db_dir / f"{tag}_s1_best_proj.pt"
     best_s1_lr = None
 
     if args.stage in ("s1", "both"):
@@ -167,7 +172,7 @@ def main():
             print(f"  stage1_lr={s1_lr:.6g}  (range: [{lo:.1e}, {hi:.1e}])")
 
             set_seed(seed)
-            projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout, use_layernorm=use_layernorm).to(device)
+            projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout, depth=proj_depth, use_layernorm=use_layernorm).to(device)
 
             lm.load_state_dict(lm_init_state)
             lm.eval()
@@ -207,7 +212,7 @@ def main():
         s1_study = optuna.create_study(
             direction="minimize",
             pruner=optuna.pruners.MedianPruner(n_startup_trials=3, n_warmup_steps=5),
-            study_name=f"lr_search_{args.model}_s1",
+            study_name=f"lr_search_{tag}_s1",
             storage=storage,
             load_if_exists=True,
         )
@@ -227,7 +232,7 @@ def main():
         if not s1_proj_path.exists():
             print("Best S1 projection not on disk -- rerunning best trial to regenerate")
             set_seed(seed)
-            projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout, use_layernorm=use_layernorm).to(device)
+            projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout, depth=proj_depth, use_layernorm=use_layernorm).to(device)
             lm.load_state_dict(lm_init_state)
             lm.eval()
             for p in lm.parameters():
@@ -268,7 +273,7 @@ def main():
             print(f"  stage2_lm_lr={s2_lm_lr:.6g}    (range: [{s2_lm_range[0]:.1e}, {s2_lm_range[1]:.1e}])")
 
             set_seed(seed)
-            projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout, use_layernorm=use_layernorm).to(device)
+            projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout, depth=proj_depth, use_layernorm=use_layernorm).to(device)
             projection.load_state_dict(best_s1_projection_state)
 
             lm.load_state_dict(lm_init_state)
@@ -305,7 +310,7 @@ def main():
         s2_study = optuna.create_study(
             direction="minimize",
             pruner=optuna.pruners.MedianPruner(n_startup_trials=3, n_warmup_steps=5),
-            study_name=f"lr_search_{args.model}_s2",
+            study_name=f"lr_search_{tag}_s2",
             storage=storage,
             load_if_exists=True,
         )
@@ -328,17 +333,20 @@ def main():
 
     if best_s1_lr is None:
         s1_study = optuna.load_study(
-            study_name=f"lr_search_{args.model}_s1",
+            study_name=f"lr_search_{tag}_s1",
             storage=storage,
         )
         best_s1 = s1_study.best_trial
         best_s1_lr = best_s1.params["stage1_lr"]
 
     if args.stage == "s1":
-        cfg["stage1"]["lr"] = float(best_s1_lr)
-        with open(config_path, "w") as f:
-            yaml.dump(cfg, f, default_flow_style=False, sort_keys=False)
-        print(f"Updated {config_path} with best S1 LR")
+        if proj_depth == 2:
+            cfg["stage1"]["lr"] = float(best_s1_lr)
+            with open(config_path, "w") as f:
+                yaml.dump(cfg, f, default_flow_style=False, sort_keys=False)
+            print(f"Updated {config_path} with best S1 LR")
+        else:
+            print(f"depth={proj_depth}: best S1 LR = {best_s1_lr:.6g} (config not modified)")
         return
 
     print(f"\n{'='*50}")
@@ -349,6 +357,8 @@ def main():
 
     results = {
         "model": args.model,
+        "proj_depth": proj_depth,
+        "use_layernorm": use_layernorm,
         "n_trials": args.n_trials,
         "epochs_per_stage": args.epochs_per_stage,
         "stage1": {
@@ -370,17 +380,20 @@ def main():
             ],
         },
     }
-    out_path = results_dir / f"{args.model}_lr_search.json"
+    out_path = results_dir / f"{tag}_lr_search.json"
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
     print(f"Results saved to {out_path}")
 
-    cfg["stage1"]["lr"] = float(best_s1_lr)
-    cfg["stage2"]["projection_lr"] = float(best_s2.params["stage2_proj_lr"])
-    cfg["stage2"]["lm_lr"] = float(best_s2.params["stage2_lm_lr"])
-    with open(config_path, "w") as f:
-        yaml.dump(cfg, f, default_flow_style=False, sort_keys=False)
-    print(f"Updated {config_path} with best LRs")
+    if proj_depth == 2:
+        cfg["stage1"]["lr"] = float(best_s1_lr)
+        cfg["stage2"]["projection_lr"] = float(best_s2.params["stage2_proj_lr"])
+        cfg["stage2"]["lm_lr"] = float(best_s2.params["stage2_lm_lr"])
+        with open(config_path, "w") as f:
+            yaml.dump(cfg, f, default_flow_style=False, sort_keys=False)
+        print(f"Updated {config_path} with best LRs")
+    else:
+        print(f"depth={proj_depth}: config not modified (best LRs saved to {out_path})")
 
 
 if __name__ == "__main__":
