@@ -37,39 +37,39 @@ uv run python scripts/prepare_data.py
 uv run python scripts/prepare_data.py --precompute-clap
 ```
 
-### 3. Run the pipeline (step by step)
+### 3. Run the pipeline (per model)
 
-Each script takes model names as arguments and skips already-completed runs.
+LR search, baselines, noise floor, and evaluation are run manually.
+Ablation scripts automate the many configs.
 
-```bash
-# Step 1: LR search (re-search if ceiling/flooring detected)
-./scripts/run_1_lr_search.sh gpt2 t5 opt llama
-
-# Step 2: Train and evaluate baselines
-./scripts/run_2_baselines.sh gpt2 t5 opt llama
-
-# Step 2b: Noise floor — retrain the baseline with extra seeds to measure
-#          run-to-run variance (GPT-2 x3 primary, T5 x2 cross-check).
-#          Reuses the seed-42 baseline above; only the training RNG varies.
-./scripts/run_2b_noise_floor.sh gpt2 t5
-
-# Step 3: Architectural ablations
-./scripts/run_3_arch_ablations.sh gpt2 t5 llama
-
-# Step 4: Decoding ablations (eval-only, on baseline checkpoint)
-./scripts/run_4_decoding_ablations.sh gpt2 t5 llama
-```
-
-> **Scope:** full ablations (steps 3-4) target GPT-2 / T5 / LLaMA — three distinct
-> architecture families. OPT is the same family as GPT-2, so it is run baseline-only
-> (steps 1-2) as a scale data point. The noise floor (step 2b) is measured on the two
-> cheapest models and applied as an indicative scale to the rest.
-
-### 4. Evaluate a single model
+Example for GPT-2:
 
 ```bash
-uv run python scripts/evaluate.py --model gpt2 --stage 2
+# LR search (check ceiling/flooring after each)
+uv run python scripts/lr_search.py --model gpt2
+uv run python scripts/lr_search.py --model gpt2 --proj-depth 3
+
+# Baseline + noise floor training
+uv run python scripts/train_gpt2.py
+uv run python scripts/train_gpt2.py --seed 43
+uv run python scripts/train_gpt2.py --seed 44
+
+# Evaluate all seeds
+uv run python scripts/evaluate.py --stage 2 --model gpt2 --ckpt-tag gpt2
+uv run python scripts/evaluate.py --stage 2 --model gpt2 --ckpt-tag gpt2_seed43
+uv run python scripts/evaluate.py --stage 2 --model gpt2 --ckpt-tag gpt2_seed44
+
+# Arch ablations (6 configs, trains + evals each)
+./scripts/run_arch_ablations.sh gpt2
+
+# Decoding ablations (eval-only, ~19 configs)
+./scripts/run_decoding_ablations.sh gpt2
 ```
+
+> **Scope:** full ablations target GPT-2 / T5 / LLaMA — three distinct architecture
+> families. OPT is the same family as GPT-2, so it is run baseline-only as a scale
+> data point. The noise floor is measured on the two cheapest models (GPT-2 x3 seeds,
+> T5 x2 seeds) and applied as an indicative scale to the rest.
 
 ## Pipeline Steps
 
@@ -77,10 +77,11 @@ uv run python scripts/evaluate.py --model gpt2 --stage 2
 |------|--------|-------------|
 | Data prep | `scripts/prepare_data.py` | Downloads MusicCaps, extracts audio, saves HF dataset |
 | CLAP embeddings | `scripts/prepare_data.py --precompute-clap` | Caches CLAP audio embeddings to `data/clap_embeddings.pt` |
-| LR search | `scripts/lr_search.py --model <name>` | Optuna-based hyperparameter search per model |
+| LR search | `scripts/lr_search.py --model <name>` | Optuna-based hyperparameter search per model; `--proj-depth N` for non-baseline depths |
 | Training | `scripts/train_<model>.py` | Per-model training (stage 1 + stage 2); `--seed N` for noise-floor runs |
-| Noise floor | `scripts/run_2b_noise_floor.sh` | Retrains baselines with extra seeds; floor = FENSE spread across seeds |
 | Evaluation | `scripts/evaluate.py` | Generates captions and computes metrics |
+| Arch ablations | `scripts/run_arch_ablations.sh` | Trains + evals 6 arch configs per model |
+| Decoding ablations | `scripts/run_decoding_ablations.sh` | Eval-only, ~19 decoding configs per model |
 
 ## Ablations
 
@@ -121,12 +122,9 @@ scripts/
   dataset.py           Dataloader with CLAP caching
   projection.py        Shared MLP projection module
   trainer.py           Shared training loop + early stopping
-  utils.py             Seed setting
-  run_1_lr_search.sh       LR search per model
-  run_2_baselines.sh       Train + eval baselines
-  run_2b_noise_floor.sh    Retrain baselines with extra seeds (variance/noise floor)
-  run_3_arch_ablations.sh  Train + eval arch ablations
-  run_4_decoding_ablations.sh  Eval-only decoding ablations
+  utils.py                 Seed setting, depth-LR auto-loader
+  run_arch_ablations.sh    Train + eval arch ablations (6 configs/model)
+  run_decoding_ablations.sh  Eval-only decoding ablations (~19 configs/model)
 data/                 Dataset and cached embeddings
 checkpoints/          Model checkpoints (per tag)
 results/              JSON results (per model, per ablation)

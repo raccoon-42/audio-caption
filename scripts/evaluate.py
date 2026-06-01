@@ -287,10 +287,8 @@ def main():
         ],
     }
 
-    if args.ablation_tag:
-        out_path = results_dir / f"{args.model}_ablation_{args.ablation_tag}.json"
-    else:
-        out_path = results_dir / f"{args.model}_eval_stage{args.stage}.json"
+    tag = args.ablation_tag or args.ckpt_tag
+    out_path = results_dir / f"{args.model}_ablation_{tag}.json"
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
 

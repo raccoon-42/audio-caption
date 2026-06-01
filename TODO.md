@@ -2,10 +2,11 @@
 
 ## GPT-2
 
-- [ ] LR search depth2
-- [ ] LR search depth3
-- [ ] Baseline training + eval
-- [ ] Noise floor (seeds 43, 44)
+- [X] LR search depth2
+- [X] LR search depth3
+- [ ] Baseline training (seed 42)
+- [ ] Noise floor training (seeds 43, 44)
+- [ ] Evaluate all seeds (42, 43, 44)
 - [ ] Arch ablations (6 configs) + eval
 - [ ] Decoding ablations (~19 configs, eval-only)
 
@@ -13,8 +14,9 @@
 
 - [ ] LR search depth2
 - [ ] LR search depth3
-- [ ] Baseline training + eval
-- [ ] Noise floor (seed 43)
+- [ ] Baseline training (seed 42)
+- [ ] Noise floor training (seed 43)
+- [ ] Evaluate all seeds (42, 43)
 - [ ] Arch ablations (6 configs) + eval
 - [ ] Decoding ablations (~19 configs, eval-only)
 
@@ -22,7 +24,7 @@
 
 - [ ] LR search depth2
 - [ ] LR search depth3
-- [ ] Baseline training + eval
+- [ ] Baseline training (seed 42) + eval
 - [ ] Arch ablations (6 configs) + eval
 - [ ] Decoding ablations (~19 configs, eval-only)
 

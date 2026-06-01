@@ -11,7 +11,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from dataset import load_dataloaders
 from projection import Projection
 from trainer import train_loop, save_results
-from utils import set_seed
+from utils import set_seed, override_lrs_for_depth
 
 
 def train_one_epoch(projection, model, dataloader, optimizer, prefix_len, device):
@@ -92,6 +92,7 @@ def main():
     with open(args.config) as f:
         cfg = yaml.safe_load(f)
 
+    override_lrs_for_depth(cfg, "llama", args.proj_depth, cfg["results_dir"])
     prefix_len = args.prefix_len or cfg["prefix_len"]
     dropout = args.dropout if args.dropout is not None else cfg["dropout"]
     use_layernorm = args.use_layernorm or cfg.get("use_layernorm", False)
