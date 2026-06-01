@@ -79,6 +79,10 @@ def main():
     parser.add_argument("--patience", type=int, default=5)
     parser.add_argument("--ablation-tag", type=str, default=None)
     parser.add_argument("--use-layernorm", action="store_true")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Training RNG seed (weight init / batch shuffle / dropout). "
+                             "The data split stays fixed at cfg['seed'] so every seed shares "
+                             "one identical train/val/test partition. Use for noise-floor runs.")
     args = parser.parse_args()
 
     with open(args.config) as f:
@@ -88,8 +92,11 @@ def main():
     dropout = args.dropout if args.dropout is not None else cfg["dropout"]
     use_layernorm = args.use_layernorm or cfg.get("use_layernorm", False)
 
-    seed = cfg["seed"]
-    set_seed(seed)
+    # Split seed is held fixed so all noise-floor seeds evaluate on one identical test set;
+    # only the training RNG (init / shuffle / dropout) varies across seeds.
+    split_seed = cfg["seed"]
+    train_seed = args.seed if args.seed is not None else cfg["seed"]
+    set_seed(train_seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # -- models --
@@ -101,7 +108,7 @@ def main():
     for p in t5.parameters():
         p.requires_grad = False
 
-    train_loader, val_loader, test_loader, audio_dim = load_dataloaders(cfg, tokenizer, seed=seed)
+    train_loader, val_loader, test_loader, audio_dim = load_dataloaders(cfg, tokenizer, seed=split_seed)
     lm_dim = t5.config.d_model
 
     projection = Projection(
@@ -109,7 +116,9 @@ def main():
         use_layernorm=use_layernorm,
     ).to(device)
 
-    tag = args.ablation_tag or "t5"
+    base_tag = args.ablation_tag or "t5"
+    # Suffix non-default seeds so extra noise-floor runs never overwrite the canonical baseline.
+    tag = base_tag if train_seed == split_seed else f"{base_tag}_seed{train_seed}"
     ckpt_dir = Path(cfg["checkpoint_dir"]) / tag
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     results_dir = Path(cfg["results_dir"]) / "t5"
@@ -137,7 +146,7 @@ def main():
 
     save_results(
         results_dir / f"{tag}_stage1.json",
-        model_name=model_name, stage=1, seed=seed,
+        model_name=model_name, stage=1, seed=train_seed,
         best_val=best_val, history=history_s1,
         hyperparams={
             "prefix_len": prefix_len, "lr": s1["lr"],
@@ -145,6 +154,7 @@ def main():
             "batch_size": cfg["batch_size"],
             "weight_decay": cfg["weight_decay"], "dropout": dropout,
             "proj_depth": args.proj_depth, "use_layernorm": use_layernorm,
+            "split_seed": split_seed,
         },
     )
 
@@ -181,7 +191,7 @@ def main():
 
     save_results(
         results_dir / f"{tag}_stage2.json",
-        model_name=model_name, stage=2, seed=seed,
+        model_name=model_name, stage=2, seed=train_seed,
         best_val=best_val, history=history_s2,
         hyperparams={
             "prefix_len": prefix_len,
@@ -190,6 +200,7 @@ def main():
             "batch_size": cfg["batch_size"],
             "weight_decay": cfg["weight_decay"], "dropout": dropout,
             "proj_depth": args.proj_depth, "use_layernorm": use_layernorm,
+            "split_seed": split_seed,
         },
     )
 
