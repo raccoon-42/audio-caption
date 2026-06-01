@@ -4,9 +4,9 @@
 
 - [X] LR search depth2
 - [X] LR search depth3
-- [ ] Baseline training (seed 42)
-- [ ] Noise floor training (seeds 43, 44)
-- [ ] Evaluate all seeds (42, 43, 44)
+- [X] Baseline training (seed 42)
+- [X] Noise floor training (seeds 43, 44)
+- [X] Evaluate all seeds (42, 43, 44)
 - [ ] Arch ablations (6 configs) + eval
 - [ ] Decoding ablations (~19 configs, eval-only)
 

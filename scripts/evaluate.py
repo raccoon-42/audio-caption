@@ -141,15 +141,19 @@ def compute_metrics(references, hypotheses):
 
     # Standard DCASE audio-captioning suite via aac-metrics (canonical implementations):
     # BLEU-1/4, METEOR, ROUGE-L, CIDEr-D, SPICE, SPIDEr. Requires Java on the host.
-    print("  [1/2] aac-metrics (BLEU, METEOR, ROUGE-L, CIDEr-D, SPICE, SPIDEr)...")
+    print("  [1/3] aac-metrics (BLEU, METEOR, ROUGE-L, CIDEr-D, SPICE, SPIDEr)...")
     corpus_scores, _ = aac_evaluate(hypotheses, mult_references)
 
     def score(key):
         return float(corpus_scores[key].item())
 
-    print("  [2/2] FENSE...")
+    print("  [2/3] FENSE...")
     fense_eval = Evaluator(device="cuda" if torch.cuda.is_available() else "cpu")
     fense = float(fense_eval.corpus_score(hypotheses, mult_references, agg_score="mean"))
+
+    print("  [3/3] ACES...")
+    from aces import get_aces_score
+    aces = float(get_aces_score(hypotheses, references, average=True))
 
     return {
         "BLEU-1": score("bleu_1"),
@@ -160,6 +164,7 @@ def compute_metrics(references, hypotheses):
         "SPICE": score("spice"),
         "SPIDEr": score("spider"),
         "FENSE": fense,
+        "ACES": aces,
     }
 
 
