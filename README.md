@@ -20,12 +20,14 @@ All models use a shared CLAP audio encoder (frozen) and a learned MLP projection
 - Python 3.14+
 - [uv](https://docs.astral.sh/uv/) package manager
 - GPU with sufficient VRAM (batch_size=8 for GPT-2/T5/OPT, batch_size=4 for LLaMA)
-- A JRE (for SPICE / CIDEr-D, computed via the `aac-metrics` Java backend)
+- JDK 11 (aac-metrics requires Java 8-13; Java 21+ will not work): `sudo apt install openjdk-11-jre`
 
 ### 1. Install dependencies
 
 ```bash
 uv sync
+uv pip install git+https://github.com/blmoistawinde/fense.git
+uv run aac-metrics-download
 ```
 
 ### 2. Prepare data

@@ -135,16 +135,19 @@ def trim_incomplete_sentence(text):
 
 
 def compute_metrics(references, hypotheses):
+    references = [r.replace("\n", " ").strip() for r in references]
+    hypotheses = [h.replace("\n", " ").strip() for h in hypotheses]
     mult_references = [[ref] for ref in references]
 
     # Standard DCASE audio-captioning suite via aac-metrics (canonical implementations):
     # BLEU-1/4, METEOR, ROUGE-L, CIDEr-D, SPICE, SPIDEr. Requires Java on the host.
+    print("  [1/2] aac-metrics (BLEU, METEOR, ROUGE-L, CIDEr-D, SPICE, SPIDEr)...")
     corpus_scores, _ = aac_evaluate(hypotheses, mult_references)
 
     def score(key):
         return float(corpus_scores[key].item())
 
-    # FENSE (primary, audio-aware) from the official package.
+    print("  [2/2] FENSE...")
     fense_eval = Evaluator(device="cuda" if torch.cuda.is_available() else "cpu")
     fense = float(fense_eval.corpus_score(hypotheses, mult_references, agg_score="mean"))
 
@@ -189,88 +192,116 @@ def main():
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
 
-    prefix_len = args.prefix_len or cfg["prefix_len"]
-    dropout = args.dropout if args.dropout is not None else cfg["dropout"]
-    use_layernorm = args.use_layernorm or cfg.get("use_layernorm", False)
-
     seed = cfg["seed"]
     set_seed(seed)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model_name = cfg.get("model_name", DEFAULT_MODEL_NAMES.get(args.model, args.model))
+    results_dir = Path(cfg["results_dir"]) / args.model
+    results_dir.mkdir(parents=True, exist_ok=True)
+    tag = args.ablation_tag or args.ckpt_tag
+    pred_path = results_dir / f"{args.model}_predictions_{tag}.json"
 
-    print("Loading precomputed CLAP embeddings...")
-    data_dir = Path(cfg["data_dir"])
-    all_clap = torch.load(data_dir.parent / "clap_embeddings.pt", weights_only=True)
-    audio_dim = all_clap.shape[1]
+    if pred_path.exists():
+        print(f"Found cached predictions: {pred_path}")
+        with open(pred_path) as f:
+            pred_data = json.load(f)
+        references = [p["reference"] for p in pred_data["predictions"]]
+        hypotheses = [p["hypothesis"] for p in pred_data["predictions"]]
+        model_name = pred_data["model"]
+        failed = pred_data["num_failed"]
+        gen_kwargs = pred_data["gen_kwargs"]
+        predictions = pred_data["predictions"]
+    else:
+        prefix_len = args.prefix_len or cfg["prefix_len"]
+        dropout = args.dropout if args.dropout is not None else cfg["dropout"]
+        use_layernorm = args.use_layernorm or cfg.get("use_layernorm", False)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model_name = cfg.get("model_name", DEFAULT_MODEL_NAMES.get(args.model, args.model))
 
-    print(f"Loading {model_name}...")
-    model, tokenizer, lm_dim, model_type = load_model(args.model, model_name, device)
+        print("Loading precomputed CLAP embeddings...")
+        data_dir = Path(cfg["data_dir"])
+        all_clap = torch.load(data_dir.parent / "clap_embeddings.pt", weights_only=True)
+        audio_dim = all_clap.shape[1]
 
-    projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout, depth=args.proj_depth, use_layernorm=use_layernorm).to(device)
+        print(f"Loading {model_name}...")
+        model, tokenizer, lm_dim, model_type = load_model(args.model, model_name, device)
 
-    ckpt_dir = Path(cfg["checkpoint_dir"]) / (args.ckpt_tag or args.model)
-    load_checkpoints(args.model, model, projection, args.stage, ckpt_dir)
-    projection.eval()
+        projection = Projection(audio_dim, lm_dim, prefix_len, dropout=dropout, depth=args.proj_depth, use_layernorm=use_layernorm).to(device)
 
-    ds = load_from_disk(str(data_dir))
-    # 1. Split off test set (10%) - this matches dataset.py
-    split1 = ds.train_test_split(test_size=0.1, seed=seed)
-    test_data = split1["test"]
-    test_indices = test_data._indices.column("indices").to_pylist()
-    test_clap = all_clap[test_indices]
+        ckpt_dir = Path(cfg["checkpoint_dir"]) / (args.ckpt_tag or args.model)
+        load_checkpoints(args.model, model, projection, args.stage, ckpt_dir)
+        projection.eval()
 
-    gen_kwargs = dict(
-        max_new_tokens=args.max_new_tokens,
-        do_sample=args.do_sample,
-        num_beams=args.num_beams,
-    )
-    if args.repetition_penalty != 1.0:
-        gen_kwargs["repetition_penalty"] = args.repetition_penalty
-    if args.no_repeat_ngram_size > 0:
-        gen_kwargs["no_repeat_ngram_size"] = args.no_repeat_ngram_size
-    if args.num_beams > 1:
-        gen_kwargs["length_penalty"] = args.length_penalty
-    if args.do_sample:
-        gen_kwargs["temperature"] = args.temperature
-        gen_kwargs["top_p"] = args.top_p
+        ds = load_from_disk(str(data_dir))
+        split1 = ds.train_test_split(test_size=0.1, seed=seed)
+        test_data = split1["test"]
+        test_indices = test_data._indices.column("indices").to_pylist()
+        test_clap = all_clap[test_indices]
 
-    print(f"Evaluating {args.model} stage {args.stage} on {len(test_data)} test samples")
-    print(f"Generation config: {gen_kwargs}")
+        gen_kwargs = dict(
+            max_new_tokens=args.max_new_tokens,
+            do_sample=args.do_sample,
+            num_beams=args.num_beams,
+        )
+        if args.repetition_penalty != 1.0:
+            gen_kwargs["repetition_penalty"] = args.repetition_penalty
+        if args.no_repeat_ngram_size > 0:
+            gen_kwargs["no_repeat_ngram_size"] = args.no_repeat_ngram_size
+        if args.num_beams > 1:
+            gen_kwargs["length_penalty"] = args.length_penalty
+        if args.do_sample:
+            gen_kwargs["temperature"] = args.temperature
+            gen_kwargs["top_p"] = args.top_p
 
-    references = []
-    hypotheses = []
-    failed = 0
+        print(f"Evaluating {args.model} stage {args.stage} on {len(test_data)} test samples")
+        print(f"Generation config: {gen_kwargs}")
 
-    for i in tqdm(range(len(test_data)), desc="Generating"):
-        try:
-            audio_emb = test_clap[i].to(device)
+        references = []
+        hypotheses = []
+        failed = 0
 
-            caption = generate_caption(
-                args.model, model, projection, tokenizer, audio_emb,
-                prefix_len, device, gen_kwargs,
-            )
+        for i in tqdm(range(len(test_data)), desc="Generating"):
+            try:
+                audio_emb = test_clap[i].to(device)
 
-            if args.trim_incomplete:
-                caption = trim_incomplete_sentence(caption)
+                caption = generate_caption(
+                    args.model, model, projection, tokenizer, audio_emb,
+                    prefix_len, device, gen_kwargs,
+                )
 
-            references.append(test_data[i]["caption"])
-            hypotheses.append(caption)
-        except Exception as e:
-            failed += 1
-            if failed <= 5:
-                print(f"  Sample {i} failed: {e}")
+                if args.trim_incomplete:
+                    caption = trim_incomplete_sentence(caption)
 
-    print(f"Generated {len(hypotheses)}/{len(test_data)} captions ({failed} failed)")
+                references.append(test_data[i]["caption"])
+                hypotheses.append(caption)
+            except Exception as e:
+                failed += 1
+                if failed <= 5:
+                    print(f"  Sample {i} failed: {e}")
+
+        print(f"Generated {len(hypotheses)}/{len(test_data)} captions ({failed} failed)")
+
+        predictions = [
+            {"reference": ref, "hypothesis": hyp}
+            for ref, hyp in zip(references, hypotheses)
+        ]
+        with open(pred_path, "w") as f:
+            json.dump({
+                "model": model_name,
+                "stage": args.stage,
+                "seed": seed,
+                "num_samples": len(hypotheses),
+                "num_failed": failed,
+                "trim_incomplete": args.trim_incomplete,
+                "gen_kwargs": gen_kwargs,
+                "predictions": predictions,
+            }, f, indent=2)
+        print(f"Predictions cached to {pred_path}")
 
     print("Computing metrics...")
     metrics = compute_metrics(references, hypotheses)
 
     for k, v in metrics.items():
         print(f"  {k}: {v:.4f}")
-
-    results_dir = Path(cfg["results_dir"]) / args.model
-    results_dir.mkdir(parents=True, exist_ok=True)
 
     results = {
         "model": model_name,
@@ -281,13 +312,9 @@ def main():
         "trim_incomplete": args.trim_incomplete,
         "gen_kwargs": gen_kwargs,
         "metrics": metrics,
-        "predictions": [
-            {"reference": ref, "hypothesis": hyp}
-            for ref, hyp in zip(references, hypotheses)
-        ],
+        "predictions": predictions,
     }
 
-    tag = args.ablation_tag or args.ckpt_tag
     out_path = results_dir / f"{args.model}_ablation_{tag}.json"
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
