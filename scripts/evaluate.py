@@ -145,7 +145,6 @@ def compute_metrics(references, hypotheses):
             "bleu_1", "bleu_4", "meteor", "rouge_l",
             "cider_d", "spice", "spider",
             "spider_max", "sbert_sim", "fer", "fense", "spider_fl",
-            "clap_sim", "mace",
             "bert_score",
         ],
     )
@@ -170,8 +169,6 @@ def compute_metrics(references, hypotheses):
         "FER": score("fer"),
         "FENSE": score("fense"),
         "SPIDEr-FL": score("spider_fl"),
-        "CLAP-sim": score("clap_sim"),
-        "MACE": score("mace"),
         "BERTScore": score("bert_score"),
         "ACES": aces,
     }
