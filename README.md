@@ -103,12 +103,13 @@ uv run python scripts/evaluate.py --stage 2 --model gpt2 --ckpt-tag gpt2_seed44
 
 ## Metrics
 
-Computed via the [`aac-metrics`](https://github.com/Labbeti/aac-metrics) suite (canonical DCASE implementations) plus the official FENSE:
+Computed via [`aac-metrics`](https://github.com/Labbeti/aac-metrics) (all 15 built-in metrics) and [`aces-metric`](https://github.com/GlJS/ACES):
 
-- BLEU-1, BLEU-4, METEOR, ROUGE-L, CIDEr-D, SPICE, SPIDEr
-- FENSE — primary metric (audio-aware, reference-robust)
+**Legacy:** BLEU-1, BLEU-4, METEOR, ROUGE-L, CIDEr-D, SPICE, SPIDEr, BERTScore
+**AAC-specific:** SPIDEr-max, SBERT-sim, FER, FENSE, SPIDEr-FL, CLAP-sim, MACE
+**External:** ACES — semantic sound descriptor similarity (WHO, WHAT, HOW, WHERE)
 
-SPICE and CIDEr-D are Java-backed, so a JRE is required (see Prerequisites). FENSE is reported as primary because the single-reference-per-clip nature of MusicCaps makes n-gram metrics noisy; those are reported as supporting.
+SPICE and CIDEr-D are Java-backed (JDK 11 required, see Prerequisites). FENSE is reported as primary because the single-reference-per-clip nature of MusicCaps makes n-gram metrics noisy. ACES and MACE complement FENSE with domain-specific semantic and multimodal evaluation.
 
 ## Project Structure
 

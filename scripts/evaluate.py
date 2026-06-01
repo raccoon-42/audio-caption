@@ -9,7 +9,6 @@ import torch
 import yaml
 from datasets import load_from_disk
 from aac_metrics import evaluate as aac_evaluate
-from fense.evaluator import Evaluator
 from tqdm import tqdm
 from transformers import (
     AutoModelForCausalLM,
@@ -139,19 +138,22 @@ def compute_metrics(references, hypotheses):
     hypotheses = [h.replace("\n", " ").strip() for h in hypotheses]
     mult_references = [[ref] for ref in references]
 
-    # Standard DCASE audio-captioning suite via aac-metrics (canonical implementations):
-    # BLEU-1/4, METEOR, ROUGE-L, CIDEr-D, SPICE, SPIDEr. Requires Java on the host.
-    print("  [1/3] aac-metrics (BLEU, METEOR, ROUGE-L, CIDEr-D, SPICE, SPIDEr)...")
-    corpus_scores, _ = aac_evaluate(hypotheses, mult_references)
+    print("  [1/2] aac-metrics...")
+    corpus_scores, _ = aac_evaluate(
+        hypotheses, mult_references,
+        metrics=[
+            "bleu_1", "bleu_4", "meteor", "rouge_l",
+            "cider_d", "spice", "spider",
+            "spider_max", "sbert_sim", "fer", "fense", "spider_fl",
+            "clap_sim", "mace",
+            "bert_score",
+        ],
+    )
 
     def score(key):
         return float(corpus_scores[key].item())
 
-    print("  [2/3] FENSE...")
-    fense_eval = Evaluator(device="cuda" if torch.cuda.is_available() else "cpu")
-    fense = float(fense_eval.corpus_score(hypotheses, mult_references, agg_score="mean"))
-
-    print("  [3/3] ACES...")
+    print("  [2/2] ACES...")
     from aces import get_aces_score
     aces = float(get_aces_score(hypotheses, references, average=True))
 
@@ -163,7 +165,14 @@ def compute_metrics(references, hypotheses):
         "CIDEr-D": score("cider_d"),
         "SPICE": score("spice"),
         "SPIDEr": score("spider"),
-        "FENSE": fense,
+        "SPIDEr-max": score("spider_max"),
+        "SBERT-sim": score("sbert_sim"),
+        "FER": score("fer"),
+        "FENSE": score("fense"),
+        "SPIDEr-FL": score("spider_fl"),
+        "CLAP-sim": score("clap_sim"),
+        "MACE": score("mace"),
+        "BERTScore": score("bert_score"),
         "ACES": aces,
     }
 
