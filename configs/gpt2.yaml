@@ -10,8 +10,8 @@ checkpoint_dir: checkpoints
 results_dir: results
 stage1:
   epochs: 30
-  lr: 0.006562704199715917
+  lr: 0.012424585046382004
 stage2:
   epochs: 30
-  projection_lr: 0.00033239840474800635
-  lm_lr: 9.972973584277066e-05
+  projection_lr: 9.313824998136215e-05
+  lm_lr: 0.00012003173007330727
