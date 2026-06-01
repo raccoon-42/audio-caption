@@ -26,7 +26,7 @@ All models use a shared CLAP audio encoder (frozen) and a learned MLP projection
 
 ```bash
 uv sync
-uv pip install git+https://github.com/blmoistawinde/fense.git
+uv pip install git+https://github.com/raccoon-42/fense.git
 uv run aac-metrics-download
 ```
 
@@ -49,6 +49,7 @@ Example for GPT-2:
 ```bash
 # LR search (check ceiling/flooring after each)
 uv run python scripts/lr_search.py --model gpt2
+uv run python scripts/lr_search.py --model gpt2 --proj-depth 1
 uv run python scripts/lr_search.py --model gpt2 --proj-depth 3
 
 # Baseline + noise floor training
