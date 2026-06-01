@@ -105,7 +105,8 @@ def main():
     lm_dim = t5.config.d_model
 
     projection = Projection(
-        audio_dim, lm_dim, prefix_len, dropout=dropout, depth=args.proj_depth
+        audio_dim, lm_dim, prefix_len, dropout=dropout, depth=args.proj_depth,
+        use_layernorm=use_layernorm,
     ).to(device)
 
     tag = args.ablation_tag or "t5"

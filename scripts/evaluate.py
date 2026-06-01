@@ -2,18 +2,14 @@
 
 import argparse
 import json
-import math
-from collections import Counter
+import re
 from pathlib import Path
 
-import numpy as np
 import torch
 import yaml
 from datasets import load_from_disk
-from nltk.translate.bleu_score import corpus_bleu, SmoothingFunction
-from nltk.translate.meteor_score import meteor_score as nltk_meteor
+from aac_metrics import evaluate as aac_evaluate
 from fense.evaluator import Evaluator
-from rouge_score import rouge_scorer
 from tqdm import tqdm
 from transformers import (
     AutoModelForCausalLM,
@@ -24,11 +20,6 @@ from transformers import (
     T5ForConditionalGeneration,
     T5Tokenizer,
 )
-
-import nltk
-nltk.download("wordnet", quiet=True)
-nltk.download("punkt_tab", quiet=True)
-nltk.download("omw-1.4", quiet=True)
 
 from projection import Projection
 from utils import set_seed
@@ -143,95 +134,28 @@ def trim_incomplete_sentence(text):
     return text.strip()
 
 
-def compute_cider(references, hypotheses, n=4):
-    """CIDEr-D metric."""
-    doc_freq = Counter()
-    for ref in references:
-        tokens = ref.lower().split()
-        ngram_set = set()
-        for k in range(1, n + 1):
-            for i in range(len(tokens) - k + 1):
-                ngram_set.add(tuple(tokens[i:i + k]))
-        doc_freq.update(ngram_set)
-    num_docs = len(references)
-
-    def get_ngrams(text):
-        tokens = text.lower().split()
-        ngrams = {}
-        for k in range(1, n + 1):
-            counts = Counter()
-            for i in range(len(tokens) - k + 1):
-                counts[tuple(tokens[i:i + k])] += 1
-            ngrams[k] = counts
-        return ngrams, len(tokens)
-
-    def tfidf_vec(ngrams, length, k):
-        vec = {}
-        denom = max(length - k + 1, 1)
-        for ng, count in ngrams[k].items():
-            tf = count / denom
-            idf = math.log(max(num_docs, 1.0) / max(doc_freq.get(ng, 0), 1.0))
-            vec[ng] = tf * idf
-        return vec
-
-    def cosine(v1, v2):
-        common = set(v1) & set(v2)
-        if not common:
-            return 0.0
-        dot = sum(v1[k] * v2[k] for k in common)
-        n1 = math.sqrt(sum(v ** 2 for v in v1.values()))
-        n2 = math.sqrt(sum(v ** 2 for v in v2.values()))
-        return dot / (n1 * n2) if n1 > 0 and n2 > 0 else 0.0
-
-    scores = []
-    for ref, hyp in zip(references, hypotheses):
-        ref_ng, ref_len = get_ngrams(ref)
-        hyp_ng, hyp_len = get_ngrams(hyp)
-        score = 0.0
-        for k in range(1, n + 1):
-            ref_vec = tfidf_vec(ref_ng, ref_len, k)
-            hyp_vec = tfidf_vec(hyp_ng, hyp_len, k)
-            score += cosine(hyp_vec, ref_vec)
-        scores.append(score / n)
-
-    return float(np.mean(scores) * 10)
-
-
 def compute_metrics(references, hypotheses):
-    refs_tokenized = [[ref.lower().split()] for ref in references]
-    hyps_tokenized = [hyp.lower().split() for hyp in hypotheses]
+    mult_references = [[ref] for ref in references]
 
-    smooth = SmoothingFunction().method1
-    bleu1 = corpus_bleu(refs_tokenized, hyps_tokenized,
-                        weights=(1.0, 0, 0, 0), smoothing_function=smooth)
-    bleu4 = corpus_bleu(refs_tokenized, hyps_tokenized,
-                        weights=(0.25, 0.25, 0.25, 0.25), smoothing_function=smooth)
+    # Standard DCASE audio-captioning suite via aac-metrics (canonical implementations):
+    # BLEU-1/4, METEOR, ROUGE-L, CIDEr-D, SPICE, SPIDEr. Requires Java on the host.
+    corpus_scores, _ = aac_evaluate(hypotheses, mult_references)
 
-    meteor_scores = []
-    for ref, hyp in zip(references, hypotheses):
-        score = nltk_meteor([ref.lower().split()], hyp.lower().split())
-        meteor_scores.append(score)
-    meteor = float(np.mean(meteor_scores))
+    def score(key):
+        return float(corpus_scores[key].item())
 
-    scorer = rouge_scorer.RougeScorer(["rougeL"], use_stemmer=True)
-    rouge_scores = []
-    for ref, hyp in zip(references, hypotheses):
-        score = scorer.score(ref, hyp)
-        rouge_scores.append(score["rougeL"].fmeasure)
-    rouge_l = float(np.mean(rouge_scores))
-
-    cider = compute_cider(references, hypotheses)
-
+    # FENSE (primary, audio-aware) from the official package.
     fense_eval = Evaluator(device="cuda" if torch.cuda.is_available() else "cpu")
-    list_refs = [[ref] for ref in references]
-    fense = float(fense_eval.corpus_score(hypotheses, list_refs, agg_score="mean"))
+    fense = float(fense_eval.corpus_score(hypotheses, mult_references, agg_score="mean"))
 
     return {
-        "BLEU-1": float(bleu1),
-        "BLEU-4": float(bleu4),
-        "METEOR": meteor,
-        "ROUGE-L": rouge_l,
-        "CIDEr": cider,
+        "BLEU-1": score("bleu_1"),
+        "BLEU-4": score("bleu_4"),
+        "METEOR": score("meteor"),
+        "ROUGE-L": score("rouge_l"),
+        "CIDEr-D": score("cider_d"),
+        "SPICE": score("spice"),
+        "SPIDEr": score("spider"),
         "FENSE": fense,
     }
 
@@ -253,6 +177,8 @@ def main():
     parser.add_argument("--prefix-len", type=int, default=None)
     parser.add_argument("--dropout", type=float, default=None)
     parser.add_argument("--proj-depth", type=int, default=2)
+    parser.add_argument("--use-layernorm", action="store_true")
+    parser.add_argument("--trim-incomplete", action="store_true")
     parser.add_argument("--ckpt-tag", type=str, default=None,
                         help="Checkpoint dir tag, e.g. 'gpt2_prefix4'")
     parser.add_argument("--ablation-tag", type=str, default=None,
@@ -265,6 +191,7 @@ def main():
 
     prefix_len = args.prefix_len or cfg["prefix_len"]
     dropout = args.dropout if args.dropout is not None else cfg["dropout"]
+    use_layernorm = args.use_layernorm or cfg.get("use_layernorm", False)
 
     seed = cfg["seed"]
     set_seed(seed)

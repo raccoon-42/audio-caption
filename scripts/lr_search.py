@@ -142,7 +142,8 @@ def main():
     print(f"Loading models for {args.model}...")
     lm, tokenizer, lm_dim = load_model(args.model, cfg, device)
 
-    train_loader, val_loader, audio_dim = load_dataloaders(cfg, tokenizer, seed=seed, do_3way=False)
+    # do_3way=True so search validates on the val split, never the held-out test rows
+    train_loader, val_loader, _test_loader, audio_dim = load_dataloaders(cfg, tokenizer, seed=seed, do_3way=True)
 
     prefix_len = cfg["prefix_len"]
     dropout = cfg["dropout"]
