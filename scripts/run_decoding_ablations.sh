@@ -97,6 +97,12 @@ for m in "${MODELS[@]}"; do
     run $m trim_t48 --trim-incomplete --max-new-tokens 48
     run $m trim_rep1.2_ngram2_t0.3 --trim-incomplete --do-sample --repetition-penalty 1.2 --no-repeat-ngram-size 2 --temperature 0.3 --top-p 0.8
     run $m trim_ngram2 --trim-incomplete --no-repeat-ngram-size 2
+
+    # Multi-variable round 2 (from T5 single-var signals)
+    run $m trim_rep1.5 --trim-incomplete --repetition-penalty 1.5
+    run $m trim_rep1.5_ngram2 --trim-incomplete --repetition-penalty 1.5 --no-repeat-ngram-size 2
+    run $m trim_beam5 --trim-incomplete --num-beams 5
+    run $m trim_rep1.2_beam5 --trim-incomplete --repetition-penalty 1.2 --num-beams 5
 done
 
 if [ -n "$FAILED" ]; then
