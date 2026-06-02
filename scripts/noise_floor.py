@@ -9,7 +9,7 @@ import numpy as np
 
 SEED_CONFIGS = {
     "gpt2": [42, 43, 44],
-    "t5": [42, 43],
+    "t5": [42, 43, 44],
 }
 
 
