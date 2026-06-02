@@ -11,6 +11,10 @@ results/
 *.wav
 *.db
 
+# Notebook exports
+*.html
+*.pdf
+
 # IDE
 .vscode/
 .idea/
