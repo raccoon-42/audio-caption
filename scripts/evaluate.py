@@ -143,9 +143,7 @@ def compute_metrics(references, hypotheses):
         hypotheses, mult_references,
         metrics=[
             "bleu_1", "bleu_4", "meteor", "rouge_l",
-            "cider_d", "spice", "spider",
-            "spider_max", "sbert_sim", "fer", "fense", "spider_fl",
-            "bert_score",
+            "spider", "fense",
         ],
     )
 
@@ -164,12 +162,9 @@ def compute_metrics(references, hypotheses):
         "CIDEr-D": score("cider_d"),
         "SPICE": score("spice"),
         "SPIDEr": score("spider"),
-        "SPIDEr-max": score("spider_max"),
         "SBERT-sim": score("sbert_sim"),
         "FER": score("fer"),
         "FENSE": score("fense"),
-        "SPIDEr-FL": score("spider_fl"),
-        "BERTScore": score("bert_score"),
         "ACES": aces,
     }
 

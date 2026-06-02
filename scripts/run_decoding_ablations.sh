@@ -1,15 +1,24 @@
 #!/bin/bash
-# Usage: ./scripts/run_4_decoding_ablations.sh gpt2 t5 opt llama
-# Override checkpoint: CKPT_gpt2=gpt2_prefix4 ./scripts/run_4_decoding_ablations.sh gpt2
+# Usage: ./scripts/run_decoding_ablations.sh [--force-eval] gpt2 [t5] ...
+# Override checkpoint: CKPT_gpt2=gpt2_prefix4 ./scripts/run_decoding_ablations.sh gpt2
 
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
 
 EVAL="uv run python scripts/evaluate.py --stage 2"
 FAILED=""
+FORCE_EVAL=0
 
-if [ $# -eq 0 ]; then
-    echo "Usage: $0 <model1> [model2] ..."
+MODELS=()
+for arg in "$@"; do
+    case "$arg" in
+        --force-eval) FORCE_EVAL=1 ;;
+        *)            MODELS+=("$arg") ;;
+    esac
+done
+
+if [ ${#MODELS[@]} -eq 0 ]; then
+    echo "Usage: $0 [--force-eval] <model1> [model2] ..."
     echo "Override checkpoint per model: CKPT_<model>=<tag>"
     exit 1
 fi
@@ -25,7 +34,7 @@ run() {
     local ckpt_tag=$(get_ckpt_tag "$model")
 
     local result_file="results/${model}/${model}_ablation_${tag}.json"
-    if [ -f "$result_file" ]; then
+    if [ "$FORCE_EVAL" -eq 0 ] && [ -f "$result_file" ]; then
         echo "SKIP: $model | $tag (already done)"
         return
     fi
@@ -38,7 +47,7 @@ run() {
     echo ""
 }
 
-for m in "$@"; do
+for m in "${MODELS[@]}"; do
     echo "===== Decoding ablations: $m ====="
 
     run $m rep_1.1 --repetition-penalty 1.1

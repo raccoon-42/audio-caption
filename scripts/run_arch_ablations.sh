@@ -1,14 +1,25 @@
 #!/bin/bash
-# Usage: ./scripts/run_3_arch_ablations.sh gpt2 t5 opt llama
+# Usage: ./scripts/run_arch_ablations.sh [--force-train] [--force-eval] gpt2 [t5] ...
 
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
 
 EVAL="uv run python scripts/evaluate.py --stage 2"
 FAILED=""
+FORCE_TRAIN=0
+FORCE_EVAL=0
 
-if [ $# -eq 0 ]; then
-    echo "Usage: $0 <model1> [model2] ..."
+MODELS=()
+for arg in "$@"; do
+    case "$arg" in
+        --force-train) FORCE_TRAIN=1 ;;
+        --force-eval)  FORCE_EVAL=1 ;;
+        *)             MODELS+=("$arg") ;;
+    esac
+done
+
+if [ ${#MODELS[@]} -eq 0 ]; then
+    echo "Usage: $0 [--force-train] [--force-eval] <model1> [model2] ..."
     echo "Models: gpt2, t5, opt, llama"
     exit 1
 fi
@@ -17,31 +28,35 @@ train_and_eval() {
     local model=$1 tag=$2
     shift 2
 
+    local ckpt_file="checkpoints/${tag}/stage2_proj_best.pt"
     local result_file="results/${model}/${model}_ablation_${tag}.json"
 
-    if [ -f "$result_file" ]; then
-        echo "SKIP: $tag (already done: $result_file)"
-        return
+    if [ "$FORCE_TRAIN" -eq 0 ] && [ -f "$ckpt_file" ]; then
+        echo "SKIP TRAIN: $tag (checkpoint exists: $ckpt_file)"
+    else
+        echo "=========================================="
+        echo "TRAINING: $tag"
+        echo "=========================================="
+        if ! uv run python "scripts/train_${model}.py" --ablation-tag "$tag" "$@"; then
+            echo "TRAIN FAILED: $tag"
+            FAILED="$FAILED $tag(train)"
+            return
+        fi
     fi
 
-    echo "=========================================="
-    echo "TRAINING: $tag"
-    echo "=========================================="
-    if ! uv run python "scripts/train_${model}.py" --ablation-tag "$tag" "$@"; then
-        echo "TRAIN FAILED: $tag"
-        FAILED="$FAILED $tag(train)"
-        return
-    fi
-
-    echo "--- Evaluating $tag ---"
-    if ! $EVAL --model "$model" --ckpt-tag "$tag" --ablation-tag "$tag" "$@"; then
-        echo "EVAL FAILED: $tag"
-        FAILED="$FAILED $tag(eval)"
+    if [ "$FORCE_EVAL" -eq 0 ] && [ -f "$result_file" ]; then
+        echo "SKIP EVAL: $tag (already done: $result_file)"
+    else
+        echo "--- Evaluating $tag ---"
+        if ! $EVAL --model "$model" --ckpt-tag "$tag" --ablation-tag "$tag" "$@"; then
+            echo "EVAL FAILED: $tag"
+            FAILED="$FAILED $tag(eval)"
+        fi
     fi
     echo ""
 }
 
-for model in "$@"; do
+for model in "${MODELS[@]}"; do
     echo "===== Arch ablations: $model ====="
 
     train_and_eval $model ${model}_prefix4 --prefix-len 4
