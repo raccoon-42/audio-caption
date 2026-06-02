@@ -53,6 +53,8 @@ for m in "${MODELS[@]}"; do
     run $m rep_1.1 --repetition-penalty 1.1
     run $m rep_1.2 --repetition-penalty 1.2
     run $m rep_1.3 --repetition-penalty 1.3
+    run $m rep_1.5 --repetition-penalty 1.5
+    run $m rep_1.8 --repetition-penalty 1.8
 
     run $m ngram_2 --no-repeat-ngram-size 2
     run $m ngram_3 --no-repeat-ngram-size 3
@@ -74,6 +76,9 @@ for m in "${MODELS[@]}"; do
     run $m sample_t0.7_p0.9 --do-sample --temperature 0.7 --top-p 0.9
     run $m sample_t0.9_p0.95 --do-sample --temperature 0.9 --top-p 0.95
     run $m sample_t1.0_p0.95 --do-sample --temperature 1.0 --top-p 0.95
+    run $m sample_t0.3_p0.8 --do-sample --temperature 0.3 --top-p 0.8
+
+    run $m rep1.8_ngram2_t0.3 --do-sample --repetition-penalty 1.8 --no-repeat-ngram-size 2 --temperature 0.3 --top-p 0.8
 
     # Ablation: sentence trimming
     run $m trim_incomplete --trim-incomplete
