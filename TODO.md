@@ -8,7 +8,7 @@
 - [X] Noise floor training (seeds 43, 44)
 - [X] Evaluate all seeds (42, 43, 44)
 - [X] Arch ablations (6 configs) + eval
-- [ ] Decoding ablations (~19 configs, eval-only)
+- [X] Decoding ablations (~31 configs, eval-only)
 
 ## T5
 
