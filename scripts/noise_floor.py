@@ -55,10 +55,10 @@ def main():
     metrics_by_seed = load_seed_metrics(results_dir, args.model, seeds)
     stats = compute_noise_floor(metrics_by_seed)
 
-    print(f"\n{'Metric':<10} {'Mean':>8} {'Std':>8} {'Range':>8}")
-    print("-" * 36)
+    print(f"\n{'Metric':<12} {'Mean':>8} {'Std':>8} {'Range':>8}")
+    print("-" * 40)
     for key, s in stats.items():
-        print(f"{key:<10} {s['mean']:>8.4f} {s['std']:>8.4f} {s['range']:>8.4f}")
+        print(f"{key:<12} {s['mean']:>8.4f} {s['std']:>8.4f} {s['range']:>8.4f}")
 
     out = {
         "model": args.model,

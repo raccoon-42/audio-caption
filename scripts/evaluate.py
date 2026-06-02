@@ -138,7 +138,7 @@ def compute_metrics(references, hypotheses):
     hypotheses = [h.replace("\n", " ").strip() for h in hypotheses]
     mult_references = [[ref] for ref in references]
 
-    print("  [1/2] aac-metrics...")
+    print("  Computing aac-metrics...")
     corpus_scores, _ = aac_evaluate(
         hypotheses, mult_references,
         metrics=[
@@ -149,10 +149,6 @@ def compute_metrics(references, hypotheses):
 
     def score(key):
         return float(corpus_scores[key].item())
-
-    print("  [2/2] ACES...")
-    from aces import get_aces_score
-    aces = float(get_aces_score(hypotheses, references, average=True))
 
     return {
         "BLEU-1": score("bleu_1"),
@@ -165,7 +161,6 @@ def compute_metrics(references, hypotheses):
         "SBERT-sim": score("sbert_sim"),
         "FER": score("fer"),
         "FENSE": score("fense"),
-        "ACES": aces,
     }
 
 
