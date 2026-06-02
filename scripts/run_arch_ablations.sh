@@ -29,7 +29,7 @@ train_and_eval() {
     shift 2
 
     local ckpt_file="checkpoints/${tag}/stage2_proj_best.pt"
-    local result_file="results/${model}/${model}_ablation_${tag}.json"
+    local result_file="results/${model}/ablations/arch/${model}_ablation_${tag}.json"
 
     if [ "$FORCE_TRAIN" -eq 0 ] && [ -f "$ckpt_file" ]; then
         echo "SKIP TRAIN: $tag (checkpoint exists: $ckpt_file)"
@@ -48,7 +48,7 @@ train_and_eval() {
         echo "SKIP EVAL: $tag (already done: $result_file)"
     else
         echo "--- Evaluating $tag ---"
-        if ! $EVAL --model "$model" --ckpt-tag "$tag" --ablation-tag "$tag" "$@"; then
+        if ! $EVAL --model "$model" --ckpt-tag "$tag" --ablation-tag "$tag" --ablation-type arch "$@"; then
             echo "EVAL FAILED: $tag"
             FAILED="$FAILED $tag(eval)"
         fi

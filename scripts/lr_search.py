@@ -129,7 +129,7 @@ def main():
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
 
-    db_dir = Path(cfg.get("results_dir", "results")) / args.model
+    db_dir = Path(cfg.get("results_dir", "results")) / args.model / "lr_search"
     db_dir.mkdir(parents=True, exist_ok=True)
     db_path = db_dir / f"{tag}_lr_search.db"
     storage = f"sqlite:///{db_path}"
@@ -329,7 +329,7 @@ def main():
         print(f"  stage2_lm_lr:  {best_s2.params['stage2_lm_lr']:.6g}")
 
     # ---- Save results ----
-    results_dir = Path(cfg["results_dir"]) / args.model
+    results_dir = Path(cfg["results_dir"]) / args.model / "lr_search"
     results_dir.mkdir(parents=True, exist_ok=True)
 
     if best_s1_lr is None:

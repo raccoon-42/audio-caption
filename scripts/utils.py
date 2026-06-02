@@ -17,7 +17,7 @@ def set_seed(seed):
 def override_lrs_for_depth(cfg, model_key, proj_depth, results_dir="results"):
     if proj_depth == 2:
         return
-    lr_json = Path(results_dir) / model_key / f"{model_key}_depth{proj_depth}_lr_search.json"
+    lr_json = Path(results_dir) / model_key / "lr_search" / f"{model_key}_depth{proj_depth}_lr_search.json"
     if not lr_json.exists():
         raise FileNotFoundError(
             f"No LR search results for depth={proj_depth}: {lr_json}\n"

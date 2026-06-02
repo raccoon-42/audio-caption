@@ -33,14 +33,14 @@ run() {
     shift 2
     local ckpt_tag=$(get_ckpt_tag "$model")
 
-    local result_file="results/${model}/${model}_ablation_${tag}.json"
+    local result_file="results/${model}/ablations/decoding/${model}_ablation_${tag}.json"
     if [ "$FORCE_EVAL" -eq 0 ] && [ -f "$result_file" ]; then
         echo "SKIP: $model | $tag (already done)"
         return
     fi
 
     echo "=== $model (ckpt=$ckpt_tag) | $tag ==="
-    if ! $EVAL --model "$model" --ckpt-tag "$ckpt_tag" --ablation-tag "$tag" "$@"; then
+    if ! $EVAL --model "$model" --ckpt-tag "$ckpt_tag" --ablation-tag "$tag" --ablation-type decoding "$@"; then
         echo "FAILED: $model | $tag"
         FAILED="$FAILED $model|$tag"
     fi

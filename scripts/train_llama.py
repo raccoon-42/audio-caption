@@ -125,7 +125,7 @@ def main():
     tag = args.ablation_tag or "llama"
     ckpt_dir = Path(cfg["checkpoint_dir"]) / tag
     ckpt_dir.mkdir(parents=True, exist_ok=True)
-    results_dir = Path(cfg["results_dir"]) / "llama"
+    results_dir = Path(cfg["results_dir"]) / "llama" / "training"
     results_dir.mkdir(parents=True, exist_ok=True)
 
     # ========== STAGE 1: projection only ==========

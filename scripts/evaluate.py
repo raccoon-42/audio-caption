@@ -187,6 +187,9 @@ def main():
                         help="Checkpoint dir tag, e.g. 'gpt2_prefix4'")
     parser.add_argument("--ablation-tag", type=str, default=None,
                         help="Tag for output filename, e.g. 'rep_1.2'")
+    parser.add_argument("--ablation-type", type=str, default="arch",
+                        choices=["arch", "decoding"],
+                        help="Ablation category (determines output subdirectory)")
     args = parser.parse_args()
 
     config_path = args.config or f"configs/{args.model}.yaml"
@@ -196,10 +199,13 @@ def main():
     seed = cfg["seed"]
     set_seed(seed)
 
-    results_dir = Path(cfg["results_dir"]) / args.model
-    results_dir.mkdir(parents=True, exist_ok=True)
+    base_dir = Path(cfg["results_dir"]) / args.model
+    pred_dir = base_dir / "predictions"
+    ablation_dir = base_dir / "ablations" / args.ablation_type
+    pred_dir.mkdir(parents=True, exist_ok=True)
+    ablation_dir.mkdir(parents=True, exist_ok=True)
     tag = args.ablation_tag or args.ckpt_tag
-    pred_path = results_dir / f"{args.model}_predictions_{tag}.json"
+    pred_path = pred_dir / f"{args.model}_predictions_{tag}.json"
 
     if pred_path.exists():
         print(f"Found cached predictions: {pred_path}")
@@ -316,7 +322,7 @@ def main():
         "predictions": predictions,
     }
 
-    out_path = results_dir / f"{args.model}_ablation_{tag}.json"
+    out_path = ablation_dir / f"{args.model}_ablation_{tag}.json"
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
 

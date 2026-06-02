@@ -122,7 +122,7 @@ def main():
     tag = base_tag if train_seed == split_seed else f"{base_tag}_seed{train_seed}"
     ckpt_dir = Path(cfg["checkpoint_dir"]) / tag
     ckpt_dir.mkdir(parents=True, exist_ok=True)
-    results_dir = Path(cfg["results_dir"]) / "t5"
+    results_dir = Path(cfg["results_dir"]) / "t5" / "training"
     results_dir.mkdir(parents=True, exist_ok=True)
 
     # ========== STAGE 1: projection only ==========

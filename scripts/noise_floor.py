@@ -17,7 +17,7 @@ def load_seed_metrics(results_dir, model, seeds):
     metrics = {}
     for seed in seeds:
         tag = model if seed == 42 else f"{model}_seed{seed}"
-        path = results_dir / model / f"{model}_ablation_{tag}.json"
+        path = results_dir / model / "ablations" / "arch" / f"{model}_ablation_{tag}.json"
         if not path.exists():
             raise FileNotFoundError(f"Missing: {path}")
         with open(path) as f:
