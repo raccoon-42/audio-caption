@@ -10,7 +10,7 @@ data_dir: data/dataset
 checkpoint_dir: checkpoints
 results_dir: results
 stage1:
-  epochs: 30
+  epochs: 40
   lr: 0.003992418725379306
 stage2:
   epochs: 30
