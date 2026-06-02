@@ -26,7 +26,6 @@ All models use a shared CLAP audio encoder (frozen) and a learned MLP projection
 
 ```bash
 uv sync
-uv pip install git+https://github.com/raccoon-42/fense.git
 uv run aac-metrics-download
 ```
 
@@ -65,7 +64,7 @@ uv run python scripts/evaluate.py --stage 2 --model gpt2 --ckpt-tag gpt2_seed44
 # Arch ablations (6 configs, trains + evals each)
 ./scripts/run_arch_ablations.sh gpt2
 
-# Decoding ablations (eval-only, ~19 configs)
+# Decoding ablations (eval-only, ~23 configs)
 ./scripts/run_decoding_ablations.sh gpt2
 ```
 
@@ -84,7 +83,7 @@ uv run python scripts/evaluate.py --stage 2 --model gpt2 --ckpt-tag gpt2_seed44
 | Training | `scripts/train_<model>.py` | Per-model training (stage 1 + stage 2); `--seed N` for noise-floor runs |
 | Evaluation | `scripts/evaluate.py` | Generates captions and computes metrics |
 | Arch ablations | `scripts/run_arch_ablations.sh` | Trains + evals 6 arch configs per model |
-| Decoding ablations | `scripts/run_decoding_ablations.sh` | Eval-only, ~19 decoding configs per model |
+| Decoding ablations | `scripts/run_decoding_ablations.sh` | Eval-only, ~23 decoding configs per model |
 
 ## Ablations
 
@@ -103,13 +102,12 @@ uv run python scripts/evaluate.py --stage 2 --model gpt2 --ckpt-tag gpt2_seed44
 
 ## Metrics
 
-Computed via [`aac-metrics`](https://github.com/Labbeti/aac-metrics) (all 15 built-in metrics) and [`aces-metric`](https://github.com/GlJS/ACES):
+Computed via [`aac-metrics`](https://github.com/Labbeti/aac-metrics) (10 metrics from two composite calls: `spider` + `fense`):
 
-**Legacy:** BLEU-1, BLEU-4, METEOR, ROUGE-L, CIDEr-D, SPICE, SPIDEr, BERTScore
-**AAC-specific:** SPIDEr-max, SBERT-sim, FER, FENSE, SPIDEr-FL, CLAP-sim, MACE
-**External:** ACES — semantic sound descriptor similarity (WHO, WHAT, HOW, WHERE)
+**N-gram:** BLEU-1, BLEU-4, METEOR, ROUGE-L, CIDEr-D, SPICE, SPIDEr
+**Semantic:** SBERT-sim, FER, FENSE
 
-SPICE and CIDEr-D are Java-backed (JDK 11 required, see Prerequisites). FENSE is reported as primary because the single-reference-per-clip nature of MusicCaps makes n-gram metrics noisy. ACES and MACE complement FENSE with domain-specific semantic and multimodal evaluation.
+SPICE and CIDEr-D are Java-backed (JDK 11 required, see Prerequisites). FENSE is reported as primary because the single-reference-per-clip nature of MusicCaps makes n-gram metrics noisy.
 
 ## Project Structure
 
@@ -128,10 +126,16 @@ scripts/
   trainer.py           Shared training loop + early stopping
   utils.py                 Seed setting, depth-LR auto-loader
   run_arch_ablations.sh    Train + eval arch ablations (6 configs/model)
-  run_decoding_ablations.sh  Eval-only decoding ablations (~19 configs/model)
+  run_decoding_ablations.sh  Eval-only decoding ablations (~23 configs/model)
+  noise_floor.py           Compute noise floor stats from seed results
 data/                 Dataset and cached embeddings
 checkpoints/          Model checkpoints (per tag)
-results/              JSON results (per model, per ablation)
+results/              Structured results (per model):
+  lr_search/            Optuna DBs, LR search JSONs, S1 projection .pt
+  training/             Per-stage training history JSONs
+  predictions/          Cached generation outputs
+  ablations/arch/       Arch ablation result JSONs
+  ablations/decoding/   Decoding ablation result JSONs
 ```
 
 ## Reproducibility
