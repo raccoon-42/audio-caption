@@ -13,7 +13,6 @@ results/
 
 # Notebook exports
 *.html
-*.pdf
 
 # IDE
 .vscode/
