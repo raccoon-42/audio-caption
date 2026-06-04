@@ -39,7 +39,7 @@ SEARCH_RANGES = {
     "gpt2":  {"s1_lr": (1e-4, 5e-2), "s2_proj_lr": (1e-5, 1e-3), "s2_lm_lr": (5e-6, 1e-2)},
     "t5":    {"s1_lr": (1e-2, 1e-1), "s2_proj_lr": (1e-5, 1e-3), "s2_lm_lr": (5e-6, 1e-2)},
     "opt":   {"s1_lr": (1e-5, 5e-3), "s2_proj_lr": (1e-5, 1e-3), "s2_lm_lr": (5e-6, 1e-2)},
-    "llama": {"s1_lr": (1e-5, 5e-3), "s2_proj_lr": (1e-5, 1e-3), "s2_lm_lr": (1e-7, 1e-4)},
+    "llama": {"s1_lr": (1e-5, 5e-2), "s2_proj_lr": (1e-5, 1e-2), "s2_lm_lr": (1e-7, 1e-4)},
 }
 
 
