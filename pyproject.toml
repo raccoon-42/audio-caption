@@ -22,3 +22,8 @@ dependencies = [
     "transformers>=5.8.1",
     "yt-dlp>=2026.3.17",
 ]
+
+[dependency-groups]
+dev = [
+    "nbconvert[webpdf]>=7.17.1",
+]
