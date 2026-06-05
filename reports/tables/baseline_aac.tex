@@ -1,16 +1,17 @@
 \begin{table}[ht]
 \centering
-\caption{Baseline (greedy) test-set metrics --- AAC-specific metrics.}
+\caption{Baseline (greedy) test-set metrics --- AAC-specific metrics. Values show $\pm$ run-to-run standard deviation (noise floor) where measured.}
 \label{tab:baseline_aac}
 \footnotesize
 \resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%
 \begin{tabular}{lrrr}
 \toprule
-Model & SBERT-sim & FER & FENSE \\
+Model & SBERT-sim $\uparrow$ & FER $\downarrow$ & FENSE $\uparrow$ \\
 \midrule
-gpt2 & \textbf{0.5820} & \textbf{0.3478} & \textbf{0.3998} \\
-t5 & 0.5564 & 0.3251 & 0.3954 \\
+GPT-2 & \textbf{0.5820 $\pm$0.0089} & 0.3478 $\pm$0.0272 & \textbf{0.3998 $\pm$0.0137} \\
+T5 & 0.5564 $\pm$0.0170 & \textbf{0.3251 $\pm$0.0511} & 0.3954 $\pm$0.0345 \\
 \bottomrule
 \end{tabular}
 }
+\par\vspace{2pt}\footnotesize\emph{$\uparrow$: higher is better; $\downarrow$: lower is better.}
 \end{table}

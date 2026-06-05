@@ -1,0 +1,22 @@
+\begin{table}[ht]
+\centering
+\caption{Best validation loss per configuration at Stage~1 (projection only) and Stage~2 (full fine-tuning). The spread row shows the S1 spread collapsing after S2 fine-tuning (GPT-2 11$\times$, T5 31$\times$).}
+\label{tab:spread_collapse}
+\footnotesize
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%
+\begin{tabular}{lrrrr}
+\toprule
+Config & GPT-2 S1 & GPT-2 S2 & T5 S1 & T5 S2 \\
+\midrule
+baseline & 2.6480 & 2.0573 & 2.4293 & 1.8903 \\
+depth1 & 2.8870 & 2.0530 & 3.0239 & 1.8929 \\
+depth3 & 2.6068 & 2.0609 & 2.3263 & 1.8674 \\
+drop0.1 & 2.6821 & 2.0570 & 2.3150 & 1.8941 \\
+drop0.5 & 2.6138 & 2.0554 & 2.2927 & 1.8855 \\
+prefix16 & 2.5091 & 2.0861 & 2.1973 & 1.8793 \\
+prefix4 & 2.8041 & 2.0601 & 2.4628 & 1.8900 \\
+\textbf{Spread} & \textbf{0.3779} & \textbf{0.0332} & \textbf{0.8266} & \textbf{0.0267} \\
+\bottomrule
+\end{tabular}
+}
+\end{table}

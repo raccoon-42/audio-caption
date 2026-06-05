@@ -1,15 +1,28 @@
 \documentclass[9pt]{report}
 \usepackage[a4paper, margin=1in]{geometry}
 \usepackage{graphicx}
-\usepackage{hyperref}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{listings}
 \usepackage{caption}
 \usepackage{titlesec}
 \usepackage{fancyhdr}
 \usepackage{setspace}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{placeins}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage[colorlinks=true,citecolor=red,urlcolor=black,pagebackref=true]{hyperref}
+\hypersetup{linkcolor=green!45!black}
 \usepackage[sfdefault]{roboto} % Roboto as a modern sans-serif alternative to Calibri
 \usepackage[T1]{fontenc}
+
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds}
+
+\newcommand{\fense}{\textsc{Fense}}
+\newcommand{\clapenc}{\textsc{Clap}}
+\newcommand{\sys}{\textsc{ClapCap}}
 
 \renewcommand{\bibname}{REFERENCES}
 
@@ -28,19 +41,18 @@
     \centering
     \vspace*{2cm}
 
-    {\Huge \sffamily \textbf{TITLE OF THE PROJECT} \par}
+    {\Huge \sffamily \textbf{ClapCap: CLAP Prefix for Music Captioning} \par}
     \vspace{4cm}
 
     {\large
     \sffamily Team Members:\par
-    Student 1 Name \quad Student 1 ID \par
-    Student 2 Name \quad Student 2 ID \par
+    Ali Ozkaya \quad 280201092 \par
     }
 
     \vspace{1cm}
-    {\large \sffamily Advisor: Prof. Dr. XX }
+    {\large \sffamily Advisor: Prof. Dr. Aytu\u{g} Onan }
 
-    \vspace{8cm}
+    \vfill
 
     {\large \sffamily
     A Thesis Report Submitted to the \\
@@ -59,6 +71,7 @@
     İzmir Institute of Technology \\
     İzmir, Turkey \\
     June, 2026
+    \vspace*{1cm}
 
 \end{titlepage}
 
@@ -66,86 +79,634 @@
 \chapter*{Abstract}
 %\addcontentsline{toc}{chapter}{Abstract}
 
-% Provide a short summary of the entire project to present the key points.
-% Limit to 150–250 words. Avoid citations and technical jargon.
+This project studies whether a lightweight language model can describe music when fed
+nothing but a short, learned prefix projected from a frozen audio embedding. The pipeline,
+\sys{}, is the audio analogue of the ClipCap image-captioning recipe: a frozen \clapenc{} audio
+encoder produces a single clip embedding, a small projection network maps it to a fixed-length
+prefix of pseudo-tokens, and a pretrained language model generates the caption. On the MusicCaps
+dataset we run a controlled comparison of two language-model families --- GPT-2 (decoder-only,
+124M parameters) and T5-base (encoder--decoder, 220M) --- holding the encoder, projection, data
+split and evaluation fixed so that the language model is the only variable. We report a
+ten-metric evaluation suite with \fense{} as the primary score, and we measure a per-model
+noise floor from three training seeds so that every ablation delta can be judged against
+run-to-run variance. We find that (i) the two models are statistically indistinguishable at
+baseline once the noise floor is accounted for; (ii) second-stage fine-tuning erases nearly all
+architectural differences introduced in the projection stage; (iii) the largest decoding lever,
+sentence completion, improves \fense{} mostly by removing the fluency-error term rather than by
+improving semantics; and (iv) the models capture genre, instrumentation and mood well but share
+a systematic male-vocalist bias, which we trace to caption-prior amplification under uncertain
+audio evidence rather than to a missing audio cue. The work characterises the minimum viable
+architecture for music captioning; every experiment runs on a single consumer GPU.
 
 \vspace{0.5cm}
 
-\noindent \textbf{Keywords:} Keyword 1, Keyword 2, Keyword 3, Keyword 4
+\noindent \textbf{Keywords:} Music Captioning, Audio--Language Models, Prefix Conditioning, CLAP, Controlled Ablation, Evaluation Metrics
 
 %---------------------- Table of Contents ----------------------%
+{\hypersetup{linkcolor=black}
 \tableofcontents
+}
 \newpage
 
 %---------------------- Introduction ----------------------%
 \chapter{INTRODUCTION}
 
-% Introduce the project, motivate the problem, state research contributions, and outline the structure of the report.
+Most audio captioning research targets \emph{general} sound --- environmental events and
+acoustic scenes --- on AudioCaps~\cite{kim2019audiocaps} and Clotho~\cite{drossos2020clotho}.
+Music is different: a useful music caption describes \emph{musical} attributes such as genre,
+instrumentation, mood, tempo and structure rather than discrete sound events. This project asks
+a deliberately minimal question: \emph{can a lightweight language model understand music
+semantics through a simple projection from a frozen audio embedding?}
+
+Our approach, \sys{}, adapts ClipCap~\cite{mokady2021clipcap}, which captions images by
+projecting a frozen CLIP embedding into a prefix of pseudo-tokens for GPT-2. We replace the image
+encoder with a frozen \clapenc{} audio encoder~\cite{wu2023clap}, caption music instead of
+images, and --- crucially --- turn the single-LM recipe into a \emph{controlled comparison} of
+language models. Because the encoder, projection, data split and evaluation are all shared, the
+language model is the only thing that changes between conditions.
+
+The contributions of this project are:
+\begin{itemize}\itemsep2pt
+  \item An audio adaptation of the ClipCap prefix-captioning recipe to music, with a single
+        shared evaluation harness.
+  \item A \emph{noise-floor} methodology: per-model run-to-run variance from three seeds, so
+        single-run ablation deltas are interpretable rather than anecdotal.
+  \item A controlled comparison of a decoder-only (GPT-2) and an encoder--decoder (T5) language
+        model, with ablations over projection architecture and decoding strategy.
+  \item A qualitative and statistical analysis of a recurring vocalist bias, which we trace to
+        caption-prior amplification under uncertain audio evidence rather than to the audio
+        frontend alone.
+\end{itemize}
+
+This project does not claim state-of-the-art performance. Published captioning systems are
+evaluated on different datasets with different reference counts, so a numerical comparison
+would be meaningless (Chapter~\ref{ch:related}), and we do not attempt one. The contribution
+is the controlled analysis itself, together with the efficiency of the recipe --- only a small
+projection (plus the language model) is trained.
+
+The remainder of this report is organised as follows. Chapter~\ref{ch:related} reviews related
+work on prefix captioning, audio captioning and music captioning.
+Chapter~\ref{ch:method} describes the \sys{} architecture and the two-stage training
+methodology. Chapter~\ref{ch:experiments} presents the experimental setup, the evaluation
+metrics and the results of the baseline comparison, architecture ablations, decoding ablations
+and bias analysis. Chapter~\ref{ch:conclusion} summarises the findings and outlines future
+work. The appendix provides full metric tables and reproducibility instructions.
 
 %---------------------- Related Work ----------------------%
-\chapter{RELATED WORK}
+\chapter{RELATED WORK}\label{ch:related}
 
-% Provide the related literature and relevant discussion about the novelty of your project.
-% Summarize key papers, tools, or systems that are relevant to your problem.
-% Identify gaps or limitations in existing solutions that your project addresses.
+\section{Prefix captioning}
+ClipCap~\cite{mokady2021clipcap} maps a frozen CLIP image embedding to a constant-length prefix
+($K{=}10$ tokens) consumed by GPT-2, training only a small mapping network. It offers two design
+points: a lightweight transformer mapper with a frozen LM, and an MLP mapper with a fine-tuned
+LM. \sys{} is the audio analogue of the MLP-mapper, fine-tuned-LM variant. Notably, ClipCap
+reports that this variant \emph{overfits} as trainable capacity grows --- an observation we
+recover, amplified, when scaling the LM (Chapter~\ref{ch:conclusion}). In the audio domain,
+Pengi~\cite{deshmukh2023pengi} likewise conditions a small LM on an audio-derived prefix,
+framing a range of audio tasks as text generation.
+
+\section{General audio captioning}
+Audio captioning is typically benchmarked on AudioCaps~\cite{kim2019audiocaps} and
+Clotho~\cite{drossos2020clotho}, which describe general sounds and provide multiple references
+per clip. These differ from music captioning in domain, number of references, and the metrics
+commonly reported (CIDEr/SPIDEr rather than the semantic \fense{}). Cross-dataset numerical
+comparison is therefore not meaningful, and we avoid it.
+
+\section{Music captioning}
+MusicCaps~\cite{agostinelli2023musiclm} is a hand-curated set of 5{,}521 ten-second clips from
+AudioSet~\cite{gemmeke2017audioset}, each annotated by musicians with a multi-sentence caption
+and a list of musical aspects. LP-MusicCaps~\cite{doh2023lpmusiccaps} addresses caption scarcity
+by generating pseudo-captions with an LLM over tag datasets and trains a
+convolutional-encoder/BART-decoder captioner. Such domain-specific captioners are a natural
+\emph{reference} for \sys{}, but a fair comparison must run them on our exact test split and
+avoid the leakage that arises when a captioner is itself trained on MusicCaps; we leave this to
+future work.
+
+\section{Audio language models}
+End-to-end audio LLMs such as Qwen-Audio~\cite{chu2023qwenaudio} and
+SALMONN~\cite{tang2024salmonn} couple a large LM to an audio encoder and are trained on large
+instruction corpora. They are far heavier than the present recipe; we regard them as an
+upper-bound reference direction rather than a controlled comparison, since they bypass the
+frozen-encoder/learned-prefix design we study.
 
 %---------------------- Research Methodology ----------------------%
-\chapter{RESEARCH METHODOLOGY}
+\chapter{RESEARCH METHODOLOGY}\label{ch:method}
 
-% Describe the overall approach and the technical design of your solution.
-% Explain your methodology or design decisions in detail. 
-% Include system architecture, data flow diagrams, algorithms, or implementation steps if relevant.
+\section{Overview}
+A clip is encoded once by a frozen \clapenc{} model into a $d_a$-dimensional embedding. A
+projection network $f_\theta$ maps this vector to a prefix
+$p_1,\dots,p_k \in \mathbb{R}^{d_{\text{lm}}}$ of $k$ pseudo-tokens in the LM embedding space.
+The LM then generates the caption autoregressively, conditioned on the prefix
+(Figure~\ref{fig:pipeline}).
+
+\begin{figure}[htbp]\centering
+\footnotesize
+\begin{tikzpicture}[
+    node distance=6mm and 9mm,
+    box/.style={draw, rounded corners, minimum height=9mm, align=center, inner sep=3pt},
+    frozen/.style={box, fill=black!6},
+    trained/.style={box, fill=black!18, very thick},
+    data/.style={align=center, inner sep=2pt},
+    flow/.style={-{Latex[length=2mm]}, thick}]
+  \node[data] (audio) {Audio clip\\(10\,s)};
+  \node[frozen, right=of audio] (clap) {\clapenc{} encoder\\\emph{(frozen)}};
+  \node[trained, right=of clap] (proj) {Projection MLP\\\emph{(trained, $\sim$10M)}};
+  \node[data, right=of proj] (prefix) {prefix\\$p_1\!\dots p_k$};
+  \node[box, right=of prefix] (lm) {Language Model\\GPT-2 / T5};
+  \node[data, right=of lm] (cap) {Caption};
+  \draw[flow] (audio) -- (clap);
+  \draw[flow] (clap) -- node[above,font=\scriptsize]{512-d} (proj);
+  \draw[flow] (proj) -- (prefix);
+  \draw[flow] (prefix) -- (lm);
+  \draw[flow] (lm) -- (cap);
+  \node[font=\scriptsize, below=2mm of lm, align=center] (s) {Stage~1: LM frozen \quad$\rightarrow$\quad Stage~2: LM fine-tuned};
+\end{tikzpicture}
+\caption{The \sys{} pipeline. A frozen \clapenc{} encoder turns the audio clip into a single
+512-d embedding; a small projection MLP (the only newly added module) maps it to a $k$-token
+prefix in the LM embedding space; the LM generates the caption. Stage~1 trains the projection
+with the LM frozen; Stage~2 additionally fine-tunes the LM.}
+\label{fig:pipeline}
+\end{figure}
+
+\section{Audio encoder}
+We use the LAION \clapenc{} checkpoint \texttt{laion/clap-htsat-unfused}~\cite{wu2023clap},
+whose audio tower is an HTS-AT transformer~\cite{chen2022htsat} producing a $512$-dimensional
+audio embedding. \clapenc{} is trained on general audio and is \emph{not}
+music-specialised --- a deliberate test of how far a general frontend carries on a music task,
+and a limitation we revisit. Embeddings are precomputed once and cached, so the encoder never
+runs during training or evaluation. The ``unfused'' variant ingests a fixed $\sim$10\,s window,
+matching MusicCaps clip length.
+
+\section{Projection network}
+The projection is a small MLP,
+$\text{Linear}\!\rightarrow\!\text{LayerNorm}\!\rightarrow\!\text{GELU}\!\rightarrow\!
+\text{Dropout}\!\rightarrow\!\text{Linear}$, reshaped to $(k,d_{\text{lm}})$. The baseline uses
+prefix length $k{=}8$, dropout $0.3$ and depth $2$.
+
+\section{Language models}
+We compare GPT-2~\cite{radford2019gpt2} (decoder-only, 124M) and T5-base~\cite{raffel2020t5}
+(encoder--decoder, 220M). For T5 the prefix is fed to the encoder; for GPT-2 it is prepended as
+input embeddings. Extending the same harness to modern billion-parameter decoders is in progress
+(Chapter~\ref{ch:conclusion}).
+
+\section{Two-stage training}
+In Stage~1 (S1) the LM is frozen and only the projection is trained; in Stage~2 (S2) the
+projection and the full LM are fine-tuned together (the audio encoder stays frozen). S1
+corresponds to ClipCap's frozen-LM regime and S2 to its fine-tuned-LM regime. The objective in
+both stages is autoregressive cross-entropy on caption tokens conditioned on the prefix,
+\[
+  \mathcal{L} = -\sum_{j}\log p_\theta\!\left(c_j \mid p_1,\dots,p_k, c_1,\dots,c_{j-1}\right).
+\]
+We use AdamW~\cite{loshchilov2019adamw} (weight decay $0.1$), cosine
+annealing~\cite{loshchilov2017sgdr}, batch size $8$ and early stopping
+(patience $5$). Per model, only the learning rates are tuned, via a 16-trial
+Optuna~\cite{akiba2019optuna} search over an 8-epoch proxy; all else is fixed so the LM stays
+the controlled variable.
+
+\section{Efficiency}
+The only newly added module is the projection ($\sim$$10.2$M parameters): Stage~1 trains it
+alone with the LM frozen, and Stage~2 additionally fine-tunes the LM. The complete model is
+$124$M (GPT-2) or $220$M (T5) parameters --- one to two orders of magnitude smaller than the
+billion-parameter end-to-end audio LLMs --- and every experiment in this report runs on a
+single consumer GPU (NVIDIA RTX~5090). Because \clapenc{} embeddings are precomputed once,
+the audio encoder is never run during training.
 
 %---------------------- Experimental Study ----------------------%
-\chapter{EXPERIMENTAL STUDY}
+\chapter{EXPERIMENTAL STUDY}\label{ch:experiments}
 
-% Present experiments, evaluation setup, and performance analysis.
-% Describe the test environment (hardware, software, datasets).
-% Define metrics used for evaluation (accuracy, latency, etc.).
-% Present results clearly using tables, charts, or graphs. Discuss what the results show, the underlying reasons.
+\section{Experimental setup}
 
+\textbf{Test environment.}
+All experiments run on a single workstation with an NVIDIA RTX~5090 GPU. The software stack is
+Python with PyTorch and the HuggingFace \texttt{transformers} library for the models, Optuna
+for hyperparameter search, and the \texttt{aac-metrics} package (with a Java runtime for its
+CoreNLP-backed metrics) for evaluation.
+
+\textbf{Data.}
+We use MusicCaps~\cite{agostinelli2023musiclm} with a fixed three-way random split: a held-out
+test set ($n{=}529$, final metrics only), a validation set ($n{\approx}495$, for checkpoint
+selection and hyperparameter search), and the remainder for training ($n{\approx}4{,}455$). The
+split seed is fixed across all conditions, so every model and seed is scored on the identical
+test set.
+
+\textbf{Metrics.}
+A single shared harness scores all conditions with the \texttt{aac-metrics} suite: BLEU-1 and
+BLEU-4~\cite{papineni2002bleu}, METEOR~\cite{banerjee2005meteor}, ROUGE-L~\cite{lin2004rouge},
+CIDEr-D~\cite{vedantam2015cider}, SPICE~\cite{anderson2016spice}, SPIDEr~\cite{liu2017spider},
+SBERT-sim, FER and \fense{}.
+\fense{}~\cite{zhou2022fense} is our primary metric: it combines a
+Sentence-BERT~\cite{reimers2019sbert} semantic similarity with a fluency-error penalty (FER),
+making it sensitive to the semantic correctness a listener cares about. We apply no
+post-processing by default; sentence trimming is treated as an explicit decoding ablation
+(Section~\ref{sec:decoding}).
+
+\textbf{Noise floor.}
+To judge whether a delta is real, we retrain each baseline with three seeds (42,\,43,\,44),
+varying only initialisation, shuffling and dropout while holding the data split fixed. The
+standard deviation of each metric across seeds is our \emph{noise floor}; deltas smaller than it
+are not interpreted as effects.
+
+\section{Baseline comparison}\label{sec:baseline}
+Figure~\ref{fig:baseline_groups} reports greedy-decoding test metrics with per-model noise
+floors, split into the \textbf{Legacy metrics} and \textbf{AAC metrics} groups following the
+\texttt{aac-metrics} taxonomy --- the two groups live on different scales, so separate panels
+let each be inspected at its own resolution (exact values in Tables~\ref{tab:baseline_legacy}
+and~\ref{tab:baseline_aac} in the appendix). GPT-2 leads on nine of the ten metrics,
+including the primary \fense{} ($0.3998$ vs.\ $0.3954$); the exception is FER, where T5 is
+lower (better), though that gap ($0.023$) sits inside T5's own FER noise floor ($\pm0.0511$).
+The \fense{} margin ($0.004$) is likewise smaller than either
+model's \fense{} noise floor ($\pm0.0137$ for GPT-2, $\pm0.0345$ for T5). We therefore do
+\emph{not} read it as evidence that one architecture is better at music captioning under this
+recipe. The noise floor is also $\sim$$2.5\times$ larger for T5 than GPT-2, so the
+encoder--decoder is noticeably noisier run-to-run and each model must be judged against its
+\emph{own} variance.
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=\textwidth]{figures/fig_baseline_groups.pdf}
+\caption{Baseline (greedy) test-set metrics per model, grouped into
+\textbf{Legacy metrics} (left) and \textbf{AAC metrics} (right), each panel at
+its own scale. Error bars show the per-model run-to-run standard deviation
+(noise floor) where measured. All metrics are higher-is-better except FER
+(lower is better).}
+\label{fig:baseline_groups}
+\end{figure}
+
+\FloatBarrier
+\section{Stage~1 vs.\ Stage~2}\label{sec:stages}
+Figure~\ref{fig:training} shows validation loss per epoch for every projection configuration,
+and Table~\ref{tab:spread_collapse} summarises the per-configuration best values. In Stage~1,
+where only the projection is trained, the configurations spread widely (a range of
+$0.38$ for GPT-2 and $0.83$ for T5). After Stage~2 fine-tuning that spread collapses to $0.03$
+for both models --- an $11\times$ reduction for GPT-2 and $31\times$ for T5: full fine-tuning
+largely erases the architectural differences introduced by the
+projection. The S2 curves also reveal early overfitting --- validation loss bottoms within a few
+epochs and then rises --- which early stopping handles.
+
+\input{tables/spread_collapse.tex}
+
+\begin{figure}[t]\centering
+\includegraphics[width=\textwidth]{figures/fig_training_curves.pdf}
+\caption{Validation loss per epoch for all projection configurations. \emph{Left:} Stage~1
+(projection only) shows a wide spread across configurations. \emph{Right:} Stage~2 (full
+fine-tuning) collapses that spread --- the configurations become nearly indistinguishable ---
+and shows the early-overfitting onset. The baseline is drawn in bold.}
+\label{fig:training}
+\end{figure}
+
+\FloatBarrier
+\section{Architecture ablations}\label{sec:arch}
+We vary prefix length ($\{4,16\}$ around $8$), dropout ($\{0.1,0.5\}$ around $0.3$) and
+projection depth ($\{1,3\}$ around $2$), retraining each from scratch with greedy decoding.
+Figure~\ref{fig:arch} plots the resulting \fense{} against the baseline $\pm$ noise-floor band.
+Consistent with Section~\ref{sec:stages}, most configurations fall within the band: no projection
+hyperparameter reliably moves the primary metric for GPT-2. For T5 the prefix variants produce
+larger \fense{} swings, but --- as the next section shows --- these coincide with collapses in
+the fluency-error term rather than genuine semantic gains. Full per-configuration metric tables
+are given in the appendix.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\textwidth]{figures/fig_arch_noisefloor.pdf}
+\caption{Architecture-ablation \fense{} per configuration. The shaded band is the baseline
+$\pm$ one noise-floor standard deviation. Bars inside the band are not distinguishable from the
+baseline.}
+\label{fig:arch}
+\end{figure}
+
+\FloatBarrier
+\section{Decoding ablations}\label{sec:decoding}
+Decoding strategies are evaluated on the fixed baseline checkpoint (no retraining), isolating
+generation behaviour. Figure~\ref{fig:decoding_groups} shows the top configurations by
+\fense{} per model, again split into \textbf{Legacy metrics} and \textbf{AAC metrics} panels
+so each group can be read at its own resolution (full tables in the appendix,
+Tables~\ref{tab:decoding_gpt2_legacy}--\ref{tab:decoding_t5_aac}). The dominant lever is
+trimming trailing incomplete sentences: it lifts \fense{} from $0.3998$ to $0.5796$ for GPT-2
+and from $0.3954$ to $0.5762$ for T5.
+
+This gain is, however, \emph{largely an artifact of the metric}. Figure~\ref{fig:fensefer} plots
+\fense{} against FER across all decoding configurations: the relationship is almost perfectly
+inverse, and the trimmed configurations simply drive FER to near zero while the lexical metrics
+in Tables~\ref{tab:decoding_gpt2_legacy} and~\ref{tab:decoding_t5_legacy} barely move. In
+other words, trimming removes the
+fluency penalty inside \fense{} without making captions semantically more correct. We report it
+as a useful decoding choice for producing clean captions, but caution against reading the
+headline \fense{} jump as a semantic improvement.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\textwidth]{figures/fig_decoding_fense_fer.pdf}
+\caption{\fense{} vs.\ FER over all decoding configurations. The near-perfect inverse trend shows
+that \fense{} here is dominated by the fluency-error term: trimmed configurations (low FER) score
+high \fense{} without improving semantic similarity. The star is greedy decoding.}
+\label{fig:fensefer}
+\end{figure}
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=\textwidth]{figures/fig_decoding_groups.pdf}
+\caption{Decoding-ablation metrics per model (greedy baseline plus top
+configurations by \fense{}), grouped into \textbf{Legacy metrics} (left),
+\textbf{AAC metrics} (centre) and \textbf{FER} (right) panels, each at its own
+scale. The AAC panel uses markers on a zoomed (non-zero) axis to resolve the
+narrow 0.55--0.58 band of the trimmed configurations; FER is separated because
+its near-zero trimmed values would otherwise compress that axis, and its bars
+follow the same configuration order as the adjacent panel. The flat SBERT-sim
+trace next to the jumping \fense{} trace and collapsing FER bars visualises
+the trimming artifact of Figure~\ref{fig:fensefer}.}
+\label{fig:decoding_groups}
+\end{figure}
+
+\FloatBarrier
+\section{Qualitative analysis}\label{sec:qual}
+Table~\ref{tab:qual} shows representative successes and failures. The models reliably recover
+high-level musical content --- genre (rock, jazz, electronic), instrumentation (electric guitar,
+bass, drums, piano) and mood (groovy, energetic, emotional). Two failure modes recur: on
+\emph{non-music} audio the pipeline still emits a confident music caption, and greedy decoding
+occasionally degenerates into verbatim repetition. Most strikingly, both models tend to insert
+``a male vocalist singing melodically'' even when the reference explicitly states there is no
+singer.
+
+To characterise this we measured vocal-presence and vocalist-gender agreement over the full
+test set (full statistics in Tables~\ref{tab:vocal_bias} and~\ref{tab:vocal_bias_context} in
+the appendix). The bias is \emph{not} a blind spot: GPT-2 mentions vocals on 95\% of clips whose
+reference describes singing, but also on 43\% of clips marked instrumental (T5: 82\%\,/\,29\%)
+--- both models track vocal presence well above chance while skewing toward false positives.
+The skew mirrors the training captions, of which 53\% mention vocals and in which male
+vocalists outnumber female ones 2.2:1; the phrase ``male vocalist'' appears in 10\% of training
+captions but in roughly half of the generated ones. Gender is worse: on references describing a
+\emph{female} singer, T5 outputs ``male'' 89\% of the time and GPT-2 44\%, while male
+references are almost never misgendered (2--4\%). These rates persist across decoding
+configurations, so they are not a decoding artifact.
+
+To separate the frontend from the LM, we probed the frozen \clapenc{} embeddings directly with
+zero-shot text prompts: vocal vs.\ instrumental is separable at 74\% accuracy and vocalist
+gender at 76\% (female recall only 55\%). The embedding therefore carries the relevant cues,
+but noisily --- and since both LMs read the \emph{same} embedding, the gap between GPT-2
+(56\%) and T5 (11\%) in female-vocalist accuracy shows the failure is largely model-side. We
+conclude that the vocalist bias is caption-prior amplification under uncertain audio evidence,
+not a missing audio cue: a music-specialised encoder should sharpen the evidence, but the
+male-vocalist default itself is learned from the caption statistics.
+
+\input{tables/paper_qualitative.tex}
+
+\FloatBarrier
 %---------------------- Conclusions and Future Work ----------------------%
-\chapter{CONCLUSIONS AND FUTURE WORK}
+\chapter{CONCLUSIONS AND FUTURE WORK}\label{ch:conclusion}
 
-% Summarize the contributions of the project and suggest directions for further development.
+We presented \sys{}, a controlled study of lightweight language models for \emph{music}
+captioning via an audio adaptation of the ClipCap prefix recipe. Holding the frozen \clapenc{}
+encoder, the projection, the data split and the evaluation fixed, we found that a decoder-only
+and an encoder--decoder LM are statistically indistinguishable at baseline once run-to-run
+variance is measured; that second-stage fine-tuning erases projection-level differences; and
+that the largest decoding lever improves the primary metric mostly by removing a fluency penalty
+rather than by improving semantics. A reproducible vocalist bias turns out to be
+caption-prior amplification under uncertain audio evidence. The results characterise the minimum
+viable architecture for music captioning and the care needed to interpret its metrics, rather
+than chasing state of the art.
+
+\section{Limitations}
+
+\textbf{General-purpose audio frontend.} Our encoder is trained on general audio, not music. A
+music-specialised encoder (a music \clapenc{} checkpoint, MERT~\cite{li2024mert} or
+MusicFM~\cite{won2024musicfm}) is a natural and likely beneficial swap, especially for the
+fine-grained attributes (vocalist gender, instrument identity) where the embedding's cues are
+noisiest (Section~\ref{sec:qual}).
+
+\textbf{Capacity vs.\ data.} Scaling the LM is not free in this low-data regime
+($\sim$4.5k clips). In preliminary runs a billion-parameter decoder fine-tuned end-to-end
+overfits within a single epoch --- the same MLP-plus-fine-tuning overfitting that
+ClipCap~\cite{mokady2021clipcap} reports, amplified by scale --- and requires a gentler schedule
+to remain comparable. This supports the lightweight framing and motivates our in-progress
+extension to such models.
+
+\textbf{Metric caveats.} MusicCaps provides a single reference per clip, which mechanically
+depresses n-gram metrics relative to multi-reference benchmarks. And as
+Section~\ref{sec:decoding} shows, \fense{} can be inflated by fluency-driven trimming; we
+mitigate this by reporting FER and lexical metrics alongside it.
+
+\section{Future work}
+
+Future directions include: (i) extending the controlled comparison to modern
+billion-parameter decoders with the gentler fine-tuning schedule identified in preliminary
+runs; (ii) swapping the general-purpose \clapenc{} frontend for a music-specialised encoder;
+(iii) a leakage-free comparison against a domain-specific music captioner evaluated on our
+exact test split via the same harness; (iv) an LLM-as-judge and human evaluation of semantic
+correctness, reporting inter-rater agreement; and (v) joint hyperparameter optimisation over
+projection and decoding parameters, replacing the single-variable reconnaissance ablations.
+
 \chapter*{ALIGNMENT WITH UN SUSTAINABLE DEVELOPMENT GOALS}
-\addcontentsline{toc}{chapter}{ALIGNMENT WITH UN SUSTAINABLE DEVELOPMENT GOALS}  
+\addcontentsline{toc}{chapter}{ALIGNMENT WITH UN SUSTAINABLE DEVELOPMENT GOALS}
 %The project should be evaluated and related (if applicable) by considering its social, health, security, economic, sustainability, and environmental impact in the context of the United Nations Sustainable Development Goals (SDG) (https://turkiye.un.org/tr/sdgs). The impact may be direct or indirect. You can use the questions given as examples to help in the evaluation of the impact areas, or you can explain the impacts based on your questions or perspective.
 \begin{table}[h]
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{|l|l|l|}
 \hline
 \textbf{Impact Area}                     & \textbf{\begin{tabular}[c]{@{}l@{}}Does project impact?\\ Direct or indirect?\end{tabular}} & \textbf{Impact Definition}  \\ \hline
-\begin{tabular}[c]{@{}l@{}}\textbf{Social}\\ (How does the project affect people and society?\\ Who benefits from the project?\\ Does it improve accessibility, inclusion, or equality?\\ Does it reduce manual effort or improve quality of life?)\\ \\ SDG 10 - Reduced Inequalities\end{tabular}                         & Social impact                                                                               & Social definition          \\ \hline
-\begin{tabular}[c]{@{}l@{}}\textbf{Health}\\ (How does the project affect health directly or indirectly? \\ Does it reduce stress, workload, or human error?\\ Does it support health monitoring, safety, or well-being?\\ Does it prevent unsafe working conditions?)\\ \\ SDG 3 - Good Health and Well-being\end{tabular} & Health impact & Health definition    \\ \hline  
+\begin{tabular}[c]{@{}l@{}}\textbf{Social}\\ (How does the project affect people and society?\\ Who benefits from the project?\\ Does it improve accessibility, inclusion, or equality?\\ Does it reduce manual effort or improve quality of life?)\\ \\ SDG 10 - Reduced Inequalities\end{tabular}                         & Yes, indirect                                                                               & \begin{tabular}[c]{@{}l@{}}Textual music descriptions improve accessibility\\ for deaf and hard-of-hearing users and enable\\ text-based music search. The project also\\ quantifies a gender bias in generated captions\\ (male-vocalist default, female misgendering)\\ and traces its cause, supporting fairer future\\ captioning systems.\end{tabular}          \\ \hline
+\begin{tabular}[c]{@{}l@{}}\textbf{Health}\\ (How does the project affect health directly or indirectly? \\ Does it reduce stress, workload, or human error?\\ Does it support health monitoring, safety, or well-being?\\ Does it prevent unsafe working conditions?)\\ \\ SDG 3 - Good Health and Well-being\end{tabular} & Limited, indirect & \begin{tabular}[c]{@{}l@{}}Automatic captioning reduces the manual\\ annotation workload for music catalogues;\\ no direct health impact.\end{tabular}    \\ \hline
 
-\begin{tabular}[c]{@{}l@{}}\textbf{Security}\\ (How is security achieved in the project, \\ , or how does the project increase the security?\\ How is user data protected?\\ What security risks exist?)\\ \\ SDG 16 - Peace, Justice, and Strong Institutions\end{tabular} & Security impact & Security definition    \\ \hline 
+\begin{tabular}[c]{@{}l@{}}\textbf{Security}\\ (How is security achieved in the project, \\ , or how does the project increase the security?\\ How is user data protected?\\ What security risks exist?)\\ \\ SDG 16 - Peace, Justice, and Strong Institutions\end{tabular} & Yes, indirect & \begin{tabular}[c]{@{}l@{}}No personal data is processed: the project uses\\ the public MusicCaps research dataset only.\\ Code and models are open, so results are\\ auditable. The main risk is biased output,\\ which the report measures and documents\\ explicitly rather than hiding.\end{tabular}    \\ \hline
 
-\begin{tabular}[c]{@{}l@{}}\textbf{Economic}\\ (How does the project contribute to the economy? \\ Does it reduce costs?\\ Does it improve productivity?)\\ \\ SDG 8 - Decent Work and Economic Growth\end{tabular} & Economic impact & Economic definition    \\ \hline 
+\begin{tabular}[c]{@{}l@{}}\textbf{Economic}\\ (How does the project contribute to the economy? \\ Does it reduce costs?\\ Does it improve productivity?)\\ \\ SDG 8 - Decent Work and Economic Growth\end{tabular} & Yes, indirect & \begin{tabular}[c]{@{}l@{}}The lightweight recipe (124M--220M parameters,\\ $\sim$10M newly trained) runs on a single consumer\\ GPU, lowering the cost barrier for music-tech\\ applications and research compared to\\ billion-parameter end-to-end audio LLMs.\\ Automatic captions reduce manual labelling cost.\end{tabular}    \\ \hline
 
-\begin{tabular}[c]{@{}l@{}}\textbf{Sustainability and Environment}\\ (How does the project contribute to the sustainability, \\ and affect the environment? \\ Does it reduce paper usage?\\ Does it optimize energy or resource consumption? \\ Is computer system usage efficient?)\\ \\ SDG 11 - Sustainable cities and communities \\ SDG 13 - Climate Action \\ SDG 12 - Responsible Consumption and Production \end{tabular} & Environment impact & Environment definition    \\ \hline 
+\begin{tabular}[c]{@{}l@{}}\textbf{Sustainability and Environment}\\ (How does the project contribute to the sustainability, \\ and affect the environment? \\ Does it reduce paper usage?\\ Does it optimize energy or resource consumption? \\ Is computer system usage efficient?)\\ \\ SDG 11 - Sustainable cities and communities \\ SDG 13 - Climate Action \\ SDG 12 - Responsible Consumption and Production \end{tabular} & Yes, direct & \begin{tabular}[c]{@{}l@{}}Efficiency is a core design goal: small models,\\ frozen encoder with precomputed embeddings\\ (the audio encoder never runs during training),\\ and eval-only decoding ablations minimise GPU\\ hours and energy versus training large\\ end-to-end models.\end{tabular}    \\ \hline
 
-\end{tabular}
-
-
+\end{tabular}%
+}
 \end{table}
 
 %---------------------- References ----------------------%
-\begin{thebibliography}{9}
+\begingroup
+\hypersetup{linkcolor=red}  % back-reference page numbers in red (scoped to the bibliography)
+\begin{thebibliography}{99}
 \addcontentsline{toc}{chapter}{REFERENCES}
-\bibitem{ref1}
-Author Name, \textit{Title of Paper/Book}, Journal/Publisher, Year.
 
-\bibitem{ref2}
-...
+\bibitem{mokady2021clipcap}
+R.~Mokady, A.~Hertz, and A.~H. Bermano,
+``ClipCap: CLIP Prefix for Image Captioning,'' \emph{arXiv:2111.09734}, 2021.
+
+\bibitem{kim2019audiocaps}
+C.~D. Kim, B.~Kim, H.~Lee, and G.~Kim,
+``AudioCaps: Generating Captions for Audios in The Wild,'' in \emph{Proc. NAACL-HLT}, 2019.
+
+\bibitem{drossos2020clotho}
+K.~Drossos, S.~Lipping, and T.~Virtanen,
+``Clotho: An Audio Captioning Dataset,'' in \emph{Proc. ICASSP}, 2020.
+
+\bibitem{wu2023clap}
+Y.~Wu, K.~Chen, T.~Zhang, Y.~Hui, T.~Berg-Kirkpatrick, and S.~Dubnov,
+``Large-Scale Contrastive Language-Audio Pretraining with Feature Fusion and
+Keyword-to-Caption Augmentation,'' in \emph{Proc. ICASSP}, 2023.
+
+\bibitem{agostinelli2023musiclm}
+A.~Agostinelli, T.~I. Denk, Z.~Borsos, \emph{et al.},
+``MusicLM: Generating Music From Text,'' \emph{arXiv:2301.11325}, 2023.
+
+\bibitem{deshmukh2023pengi}
+S.~Deshmukh, B.~Elizalde, R.~Singh, and H.~Wang,
+``Pengi: An Audio Language Model for Audio Tasks,'' in \emph{Proc. NeurIPS}, 2023.
+
+\bibitem{gemmeke2017audioset}
+J.~F. Gemmeke, D.~P.~W. Ellis, D.~Freedman, A.~Jansen, W.~Lawrence, R.~C. Moore,
+M.~Plakal, and M.~Ritter,
+``Audio Set: An Ontology and Human-Labeled Dataset for Audio Events,'' in \emph{Proc. ICASSP},
+2017.
+
+\bibitem{doh2023lpmusiccaps}
+S.~Doh, K.~Choi, J.~Lee, and J.~Nam,
+``LP-MusicCaps: LLM-Based Pseudo Music Captioning,'' in \emph{Proc. ISMIR}, 2023.
+
+\bibitem{chu2023qwenaudio}
+Y.~Chu, J.~Xu, X.~Zhou, \emph{et al.},
+``Qwen-Audio: Advancing Universal Audio Understanding via Unified Large-Scale Audio-Language
+Models,'' \emph{arXiv:2311.07919}, 2023.
+
+\bibitem{tang2024salmonn}
+C.~Tang, W.~Yu, G.~Sun, \emph{et al.},
+``SALMONN: Towards Generic Hearing Abilities for Large Language Models,'' in \emph{Proc. ICLR},
+2024.
+
+\bibitem{chen2022htsat}
+K.~Chen, X.~Du, B.~Zhu, Z.~Ma, T.~Berg-Kirkpatrick, and S.~Dubnov,
+``HTS-AT: A Hierarchical Token-Semantic Audio Transformer for Sound Classification and
+Detection,'' in \emph{Proc. ICASSP}, 2022.
+
+\bibitem{radford2019gpt2}
+A.~Radford, J.~Wu, R.~Child, D.~Luan, D.~Amodei, and I.~Sutskever,
+``Language Models are Unsupervised Multitask Learners,'' OpenAI, Tech. Rep., 2019.
+
+\bibitem{raffel2020t5}
+C.~Raffel, N.~Shazeer, A.~Roberts, \emph{et al.},
+``Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer,''
+\emph{JMLR}, vol.~21, no.~140, 2020.
+
+\bibitem{loshchilov2019adamw}
+I.~Loshchilov and F.~Hutter,
+``Decoupled Weight Decay Regularization,'' in \emph{Proc. ICLR}, 2019.
+
+\bibitem{loshchilov2017sgdr}
+I.~Loshchilov and F.~Hutter,
+``SGDR: Stochastic Gradient Descent with Warm Restarts,'' in \emph{Proc. ICLR}, 2017.
+
+\bibitem{akiba2019optuna}
+T.~Akiba, S.~Sano, T.~Yanase, T.~Ohta, and M.~Koyama,
+``Optuna: A Next-Generation Hyperparameter Optimization Framework,'' in \emph{Proc. ACM SIGKDD},
+2019.
+
+\bibitem{papineni2002bleu}
+K.~Papineni, S.~Roukos, T.~Ward, and W.-J. Zhu,
+``BLEU: a Method for Automatic Evaluation of Machine Translation,'' in \emph{Proc. ACL}, 2002.
+
+\bibitem{banerjee2005meteor}
+S.~Banerjee and A.~Lavie,
+``METEOR: An Automatic Metric for MT Evaluation with Improved Correlation with Human
+Judgments,'' in \emph{Proc. ACL Workshop on Intrinsic and Extrinsic Evaluation Measures for
+Machine Translation and/or Summarization}, 2005.
+
+\bibitem{lin2004rouge}
+C.-Y. Lin,
+``ROUGE: A Package for Automatic Evaluation of Summaries,'' in \emph{Text Summarization
+Branches Out (ACL Workshop)}, 2004.
+
+\bibitem{vedantam2015cider}
+R.~Vedantam, C.~L. Zitnick, and D.~Parikh,
+``CIDEr: Consensus-Based Image Description Evaluation,'' in \emph{Proc. CVPR}, 2015.
+
+\bibitem{anderson2016spice}
+P.~Anderson, B.~Fernando, M.~Johnson, and S.~Gould,
+``SPICE: Semantic Propositional Image Caption Evaluation,'' in \emph{Proc. ECCV}, 2016.
+
+\bibitem{liu2017spider}
+S.~Liu, Z.~Zhu, N.~Ye, S.~Guadarrama, and K.~Murphy,
+``Improved Image Captioning via Policy Gradient Optimization of SPIDEr,'' in \emph{Proc. ICCV},
+2017.
+
+\bibitem{reimers2019sbert}
+N.~Reimers and I.~Gurevych,
+``Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks,'' in \emph{Proc.
+EMNLP-IJCNLP}, 2019.
+
+\bibitem{zhou2022fense}
+Z.~Zhou, Z.~Zhang, X.~Xu, \emph{et al.},
+``Can Audio Captions Be Evaluated with Image Caption Metrics?,'' in \emph{Proc. ICASSP}, 2022.
+
+\bibitem{li2024mert}
+Y.~Li, R.~Yuan, G.~Zhang, \emph{et al.},
+``MERT: Acoustic Music Understanding Model with Large-Scale Self-Supervised Training,'' in
+\emph{Proc. ICLR}, 2024.
+
+\bibitem{won2024musicfm}
+M.~Won, Y.-N. Hung, and D.~Le,
+``A Foundation Model for Music Informatics,'' in \emph{Proc. ICASSP}, 2024.
 
 \end{thebibliography}
+\endgroup
 
 %---------------------- Appendix ----------------------%
 \appendix
 \chapter{APPENDIX}
 
-% Provide supplementary material that supports the report but is too detailed for the main sections. 
-% Include additional diagrams, tables, code snippets, and configuration files, that are referenced but not essential to follow the main text. 
-% You can explain reproducibility steps if you provide source code and other configuration options to produce the results given in your report.
+\section{Reproducibility}
+\begin{sloppypar}
+All code, configuration files and table/figure generation scripts are available at
+\href{https://github.com/raccoon-42/audio-caption}{\texttt{github.com/raccoon-42/audio-caption}}.
+The pipeline is organised as one script per step: data preparation (CLAP embedding
+precomputation), per-model learning-rate search, baseline training, noise-floor seed
+replication, architecture ablations, decoding ablations and shared evaluation. Dependencies are
+managed with \texttt{uv}; evaluation additionally requires a Java runtime (JDK~11) and a
+one-time \texttt{aac-metrics-download} for the CoreNLP-backed metrics. Every table and figure
+in this report is generated from the result JSONs by \texttt{scripts/make\_paper\_tables.py},
+\texttt{scripts/make\_report\_tables.py} and \texttt{scripts/make\_report\_figures.py}; the
+vocalist-bias statistics come from \texttt{scripts/analyze\_vocal\_bias.py}.
+\end{sloppypar}
+
+\section{Noise-floor detail}
+Per-seed metric values behind the noise floors of
+Tables~\ref{tab:baseline_legacy} and~\ref{tab:baseline_aac}.
+
+\input{tables/noise_floor_gpt2.tex}
+\input{tables/noise_floor_t5.tex}
+
+\FloatBarrier
+\section{Stage-wise validation losses}
+Best validation loss per configuration, shown separately for Stage~1 and Stage~2 (the spread
+collapse discussed in Section~\ref{sec:stages}).
+
+\input{tables/s1_valloss_gpt2.tex}
+\input{tables/s2_valloss_gpt2.tex}
+\input{tables/s1_valloss_t5.tex}
+\input{tables/s2_valloss_t5.tex}
+
+\FloatBarrier
+\section{Baseline metric tables}
+Exact values behind Figure~\ref{fig:baseline_groups}, split into
+\textbf{Legacy metrics} and \textbf{AAC metrics}.
+
+\input{tables/baseline_legacy.tex}
+\input{tables/baseline_aac.tex}
+
+\FloatBarrier
+\section{Vocalist-bias statistics}
+Full statistics behind the bias analysis of Section~\ref{sec:qual}: per-model
+vocal-presence and gender confusion rates, the training-caption prior, and the
+zero-shot probe of the frozen audio embeddings.
+
+\input{tables/vocal_bias.tex}
+\input{tables/vocal_bias_context.tex}
+
+\FloatBarrier
+\section{Full architecture-ablation metrics}
+
+\input{tables/arch_gpt2_legacy.tex}
+\input{tables/arch_gpt2_aac.tex}
+\input{tables/arch_t5_legacy.tex}
+\input{tables/arch_t5_aac.tex}
+
+\FloatBarrier
+\section{Full decoding-ablation metrics}
+Exact values behind Figure~\ref{fig:decoding_groups}, split into
+\textbf{Legacy metrics} and \textbf{AAC metrics}.
+
+\input{tables/decoding_gpt2_legacy.tex}
+\input{tables/decoding_gpt2_aac.tex}
+\input{tables/decoding_t5_legacy.tex}
+\input{tables/decoding_t5_aac.tex}
 
 \end{document}

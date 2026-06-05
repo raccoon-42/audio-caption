@@ -30,6 +30,9 @@ LEGACY_METRICS = ["BLEU-1", "BLEU-4", "METEOR", "ROUGE-L", "CIDEr-D", "SPICE", "
 AAC_METRICS = ["SBERT-sim", "FER", "FENSE"]
 ALL_METRICS = LEGACY_METRICS + AAC_METRICS
 PRIMARY = "FENSE"
+LOWER_BETTER = {"FER"}
+DIRECTION_NOTE = r"$\uparrow$: higher is better; $\downarrow$: lower is better."
+MODEL_NAMES = {"gpt2": "GPT-2", "t5": "T5", "opt": "OPT", "llama": "LLaMA"}
 
 GROUP_TITLES = {
     "legacy": "Legacy metrics",
@@ -134,6 +137,16 @@ def write_table(path, header, rows, caption, label, col_format,
     return "\n".join(lines)
 
 
+def with_arrow(metric):
+    return rf"{metric} $\downarrow$" if metric in LOWER_BETTER else rf"{metric} $\uparrow$"
+
+
+def best_of(vals, metric):
+    """Best tag for a metric, respecting its direction."""
+    pick = min if metric in LOWER_BETTER else max
+    return pick(vals, key=vals.get)
+
+
 def fmt_metric_cell(value, is_best, baseline_std=None):
     s = f"{value:.4f}"
     if baseline_std is not None:
@@ -148,13 +161,13 @@ def metric_table(path, data, metrics, row_order, baseline_tag,
     """data: {tag: metrics_dict}. Bold best per metric column; baseline row
     gets +/- noise-floor std where available."""
     present = [m for m in metrics if any(m in data[t] for t in row_order)]
-    # best (max) per metric across rows
+    # best per metric across rows (direction-aware)
     best = {}
     for m in present:
         vals = {t: data[t][m] for t in row_order if m in data[t]}
         if vals:
-            best[m] = max(vals, key=vals.get)
-    header = [row_label] + present
+            best[m] = best_of(vals, m)
+    header = [row_label] + [with_arrow(m) for m in present]
     rows = []
     for t in row_order:
         cells = [tex_escape(t)]
@@ -168,7 +181,8 @@ def metric_table(path, data, metrics, row_order, baseline_tag,
             cells.append(fmt_metric_cell(data[t][m], best.get(m) == t, std))
         rows.append(cells)
     col_format = "l" + "r" * len(present)
-    return write_table(path, header, rows, caption, label, col_format)
+    return write_table(path, header, rows, caption, label, col_format,
+                       note=DIRECTION_NOTE)
 
 
 def valloss_table(path, train_rows, stage, model, caption, label):
@@ -191,6 +205,52 @@ def valloss_table(path, train_rows, stage, model, caption, label):
     cap = f"{caption} (spread = {spread:.4f})."
     write_table(path, header, rows, cap, label, "lrr", resize=False)
     return spread
+
+
+def spread_collapse_table(path, all_train_rows, models):
+    """One table for all models: per-config best val loss at S1 and S2, with a
+    spread (max-min) row showing the S1->S2 collapse."""
+    data = {}      # model -> stage -> {tag: val}
+    tags = set()
+    for model in models:
+        rows = [r for r in all_train_rows[model]
+                if "seed" not in r["tag"] or r["tag"] == model]
+        data[model] = {1: {}, 2: {}}
+        for r in rows:
+            data[model][r["stage"]][r["tag"]] = r["best_val_loss"]
+            tags.add((model, r["tag"]))
+    # row order: baseline first, then variants alphabetically (suffix after "model_")
+    suffixes = sorted({t[len(m) + 1:] for m, t in tags if t != m})
+    order = ["baseline"] + suffixes
+    header = ["Config"]
+    for model in models:
+        name = MODEL_NAMES.get(model, model)
+        header += [f"{name} S1", f"{name} S2"]
+    rows = []
+    for suff in order:
+        cells = [tex_escape(suff)]
+        for model in models:
+            tag = model if suff == "baseline" else f"{model}_{suff}"
+            for stage in (1, 2):
+                v = data[model][stage].get(tag)
+                cells.append(f"{v:.4f}" if v is not None else "--")
+        rows.append(cells)
+    spread_cells = [r"\textbf{Spread}"]
+    collapse = []
+    for model in models:
+        for stage in (1, 2):
+            vals = list(data[model][stage].values())
+            spread_cells.append(rf"\textbf{{{max(vals) - min(vals):.4f}}}" if vals else "--")
+        s1 = data[model][1].values(); s2 = data[model][2].values()
+        if s1 and s2:
+            c = (max(s1) - min(s1)) / (max(s2) - min(s2))
+            collapse.append(f"{MODEL_NAMES.get(model, model)} {c:.0f}$\\times$")
+    rows.append(spread_cells)
+    caption = (r"Best validation loss per configuration at Stage~1 (projection only) "
+               r"and Stage~2 (full fine-tuning). The spread row shows the S1 spread "
+               r"collapsing after S2 fine-tuning (" + ", ".join(collapse) + ").")
+    return write_table(path, header, rows, caption, "tab:spread_collapse",
+                       "l" + "r" * (2 * len(models)))
 
 
 def noise_floor_table(path, seeds, nf, metrics, model, caption, label):
@@ -236,9 +296,11 @@ def main():
     baselines = {}      # model -> metrics
     arch_data = {}      # model -> {tag: metrics}
     decode_data = {}    # model -> {tag: metrics}
+    floors = {}         # model -> noise-floor dict (or None)
     for model in args.models:
         arch_data[model] = collect_eval_results(results_dir, model, "arch")
         decode_data[model] = collect_eval_results(results_dir, model, "decoding")
+        floors[model] = load_noise_floor(results_dir, model)[1]
         if model in arch_data[model]:                     # tag == model == greedy baseline
             baselines[model] = arch_data[model][model]
 
@@ -251,22 +313,35 @@ def main():
             vals = {mo: baselines[mo][m] for mo in args.models
                     if mo in baselines and m in baselines[mo]}
             if vals:
-                best[m] = max(vals, key=vals.get)
-        header = ["Model"] + present
+                best[m] = best_of(vals, m)
+        header = ["Model"] + [with_arrow(m) for m in present]
         rows = []
         for mo in args.models:
             if mo not in baselines:
                 continue
-            cells = [tex_escape(mo)]
+            cells = [MODEL_NAMES.get(mo, tex_escape(mo))]
             for m in present:
-                cells.append(fmt_metric_cell(baselines[mo][m], best.get(m) == mo))
+                nf_m = floors.get(mo) or {}
+                std = nf_m[m]["std"] if m in nf_m else None
+                cells.append(fmt_metric_cell(baselines[mo][m], best.get(m) == mo, std))
             rows.append(cells)
         p = out_dir / f"baseline_{gname}.tex"
         tex = write_table(
             p, header, rows,
-            f"Baseline (greedy) test-set metrics --- {GROUP_TITLES[gname]}.",
-            f"tab:baseline_{gname}", "l" + "r" * len(present))
+            f"Baseline (greedy) test-set metrics --- {GROUP_TITLES[gname]}. "
+            f"Values show $\\pm$ run-to-run standard deviation (noise floor) "
+            f"where measured.",
+            f"tab:baseline_{gname}", "l" + "r" * len(present),
+            note=DIRECTION_NOTE)
         written.append(p); emit(tex, f"baseline_{gname}")
+
+    # ---- S1 -> S2 spread-collapse table (all models) ----
+    all_train_rows = {m: collect_training_results(results_dir, m) for m in args.models}
+    if any(all_train_rows.values()):
+        p = out_dir / "spread_collapse.tex"
+        tex = spread_collapse_table(p, all_train_rows,
+                                    [m for m in args.models if all_train_rows[m]])
+        written.append(p); emit(tex, "spread_collapse")
 
     # ---- per-model tables ----
     for model in args.models:

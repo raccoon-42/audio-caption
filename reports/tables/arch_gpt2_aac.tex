@@ -6,16 +6,17 @@
 \resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%
 \begin{tabular}{lrrr}
 \toprule
-Config & SBERT-sim & FER & FENSE \\
+Config & SBERT-sim $\uparrow$ & FER $\downarrow$ & FENSE $\uparrow$ \\
 \midrule
 gpt2 & 0.5820 $\pm$0.0089 & 0.3478 $\pm$0.0272 & 0.3998 $\pm$0.0137 \\
-gpt2\_depth1 & 0.5846 & \textbf{0.3535} & 0.3992 \\
+gpt2\_depth1 & 0.5846 & 0.3535 & 0.3992 \\
 gpt2\_depth3 & 0.5858 & 0.3535 & 0.4002 \\
 gpt2\_drop0.1 & \textbf{0.6029} & 0.3516 & 0.4092 \\
-gpt2\_drop0.5 & 0.5896 & 0.2987 & \textbf{0.4316} \\
+gpt2\_drop0.5 & 0.5896 & \textbf{0.2987} & \textbf{0.4316} \\
 gpt2\_prefix16 & 0.5943 & 0.3308 & 0.4199 \\
 gpt2\_prefix4 & 0.5858 & 0.3100 & 0.4221 \\
 \bottomrule
 \end{tabular}
 }
+\par\vspace{2pt}\footnotesize\emph{$\uparrow$: higher is better; $\downarrow$: lower is better.}
 \end{table}

@@ -6,16 +6,17 @@
 \resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%
 \begin{tabular}{lrrr}
 \toprule
-Config & SBERT-sim & FER & FENSE \\
+Config & SBERT-sim $\uparrow$ & FER $\downarrow$ & FENSE $\uparrow$ \\
 \midrule
 t5 & 0.5564 $\pm$0.0170 & 0.3251 $\pm$0.0511 & 0.3954 $\pm$0.0345 \\
 t5\_depth1 & 0.5702 & 0.3781 & 0.3755 \\
 t5\_depth3 & 0.5759 & 0.2476 & 0.4500 \\
 t5\_drop0.1 & 0.5883 & 0.2836 & 0.4389 \\
-t5\_drop0.5 & 0.5764 & \textbf{0.3913} & 0.3725 \\
-t5\_prefix16 & \textbf{0.5947} & 0.1853 & \textbf{0.4947} \\
+t5\_drop0.5 & 0.5764 & 0.3913 & 0.3725 \\
+t5\_prefix16 & \textbf{0.5947} & \textbf{0.1853} & \textbf{0.4947} \\
 t5\_prefix4 & 0.5898 & 0.1890 & 0.4908 \\
 \bottomrule
 \end{tabular}
 }
+\par\vspace{2pt}\footnotesize\emph{$\uparrow$: higher is better; $\downarrow$: lower is better.}
 \end{table}

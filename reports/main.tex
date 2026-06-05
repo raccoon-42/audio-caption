@@ -237,8 +237,10 @@ are not interpreted as effects.
 
 \subsection{Baseline comparison}\label{sec:baseline}
 Table~\ref{tab:baseline} reports greedy-decoding test metrics with per-model noise floors. GPT-2
-leads on every metric, including the primary \fense{} ($0.3998$ vs.\ $0.3954$), but the margin
-($0.004$) is smaller than either model's \fense{} noise floor ($\pm0.0137$ for GPT-2,
+leads on nine of the ten metrics, including the primary \fense{} ($0.3998$ vs.\ $0.3954$); the
+exception is FER, where T5 is lower (better), though that gap ($0.023$) sits inside T5's own FER
+noise floor ($\pm0.0511$). The \fense{} margin
+($0.004$) is likewise smaller than either model's \fense{} noise floor ($\pm0.0137$ for GPT-2,
 $\pm0.0345$ for T5). We therefore do \emph{not} read it as evidence that one architecture is
 better at music captioning under this recipe. The noise floor is also $\sim$$2.5\times$ larger
 for T5 than GPT-2, so the encoder--decoder is noticeably noisier run-to-run and each model must

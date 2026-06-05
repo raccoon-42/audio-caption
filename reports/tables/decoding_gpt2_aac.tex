@@ -6,12 +6,12 @@
 \resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%
 \begin{tabular}{lrrr}
 \toprule
-Config & SBERT-sim & FER & FENSE \\
+Config & SBERT-sim $\uparrow$ & FER $\downarrow$ & FENSE $\uparrow$ \\
 \midrule
-gpt2 & 0.5820 $\pm$0.0089 & \textbf{0.3478 $\pm$0.0272} & 0.3998 $\pm$0.0137 \\
+gpt2 & 0.5820 $\pm$0.0089 & 0.3478 $\pm$0.0272 & 0.3998 $\pm$0.0137 \\
 trim\_ngram2 & 0.5807 & 0.0019 & \textbf{0.5796} \\
 trim\_rep1.2\_ngram2\_t0.3 & 0.5812 & 0.0076 & 0.5775 \\
-trim\_rep1.2\_ngram2 & 0.5766 & 0.0000 & 0.5766 \\
+trim\_rep1.2\_ngram2 & 0.5766 & \textbf{0.0000} & 0.5766 \\
 trim\_rep1.2\_ngram3 & 0.5781 & 0.0019 & 0.5766 \\
 trim\_rep1.2 & 0.5774 & 0.0019 & 0.5758 \\
 trim\_rep1.3 & 0.5748 & 0.0057 & 0.5723 \\
@@ -27,4 +27,5 @@ rep\_1.8 & 0.5800 & 0.2552 & 0.4488 \\
 \bottomrule
 \end{tabular}
 }
+\par\vspace{2pt}\footnotesize\emph{$\uparrow$: higher is better; $\downarrow$: lower is better.}
 \end{table}

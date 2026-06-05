@@ -6,7 +6,7 @@
 \resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%
 \begin{tabular}{lrrrrrrr}
 \toprule
-Config & BLEU-1 & BLEU-4 & METEOR & ROUGE-L & CIDEr-D & SPICE & SPIDEr \\
+Config & BLEU-1 $\uparrow$ & BLEU-4 $\uparrow$ & METEOR $\uparrow$ & ROUGE-L $\uparrow$ & CIDEr-D $\uparrow$ & SPICE $\uparrow$ & SPIDEr $\uparrow$ \\
 \midrule
 t5 & \textbf{0.3003 $\pm$0.0122} & 0.0574 $\pm$0.0048 & \textbf{0.1162 $\pm$0.0036} & 0.2275 $\pm$0.0027 & 0.0847 $\pm$0.0181 & 0.0866 $\pm$0.0124 & 0.0857 $\pm$0.0149 \\
 t5\_depth1 & 0.2947 & 0.0546 & 0.1135 & 0.2267 & 0.0893 & 0.0953 & 0.0923 \\
@@ -18,4 +18,5 @@ t5\_prefix4 & 0.2683 & \textbf{0.0655} & 0.1157 & 0.2271 & 0.1240 & \textbf{0.11
 \bottomrule
 \end{tabular}
 }
+\par\vspace{2pt}\footnotesize\emph{$\uparrow$: higher is better; $\downarrow$: lower is better.}
 \end{table}

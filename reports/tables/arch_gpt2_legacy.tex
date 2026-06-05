@@ -6,7 +6,7 @@
 \resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%
 \begin{tabular}{lrrrrrrr}
 \toprule
-Config & BLEU-1 & BLEU-4 & METEOR & ROUGE-L & CIDEr-D & SPICE & SPIDEr \\
+Config & BLEU-1 $\uparrow$ & BLEU-4 $\uparrow$ & METEOR $\uparrow$ & ROUGE-L $\uparrow$ & CIDEr-D $\uparrow$ & SPICE $\uparrow$ & SPIDEr $\uparrow$ \\
 \midrule
 gpt2 & 0.3091 $\pm$0.0019 & 0.0631 $\pm$0.0039 & 0.1265 $\pm$0.0041 & 0.2329 $\pm$0.0017 & 0.1109 $\pm$0.0076 & 0.1091 $\pm$0.0032 & 0.1100 $\pm$0.0024 \\
 gpt2\_depth1 & 0.3103 & 0.0631 & 0.1288 & 0.2339 & 0.1078 & \textbf{0.1164} & 0.1121 \\
@@ -18,4 +18,5 @@ gpt2\_prefix4 & 0.3101 & 0.0638 & 0.1307 & 0.2327 & 0.1020 & 0.1004 & 0.1012 \\
 \bottomrule
 \end{tabular}
 }
+\par\vspace{2pt}\footnotesize\emph{$\uparrow$: higher is better; $\downarrow$: lower is better.}
 \end{table}

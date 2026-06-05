@@ -1,0 +1,23 @@
+\begin{table}[ht]
+\centering
+\caption{Model-independent context for the vocalist bias: training-caption prior over all MusicCaps captions, and zero-shot probes of the frozen \textsc{Clap} audio embeddings against caption-derived labels.}
+\label{tab:vocal_bias_context}
+\footnotesize
+\begin{tabular}{llr}
+\toprule
+Corpus prior ($n=5292$ captions) & Vocal mention & 53\% \\
+ & Male-only gender mention & 28\% \\
+ & Female-only gender mention & 13\% \\
+ & Male:female ratio & 2.2:1 \\
+ & ``male vocalist'' phrase & 10\% \\
+\midrule
+\textsc{Clap} probe: vocal/instr.\ ($n=3556$) & Accuracy & 74\% \\
+ & Recall (vocal) & 77\% \\
+ & Recall (instrumental) & 65\% \\
+\midrule
+\textsc{Clap} probe: gender ($n=2164$) & Accuracy & 76\% \\
+ & Recall (male) & 85\% \\
+ & Recall (female) & 55\% \\
+\bottomrule
+\end{tabular}
+\end{table}

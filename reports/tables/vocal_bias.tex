@@ -1,0 +1,20 @@
+\begin{table}[ht]
+\centering
+\caption{Vocal-presence and vocalist-gender statistics per model (baseline greedy predictions, $n=529$ test clips). Gender rows count only captions that mention exactly one gender.}
+\label{tab:vocal_bias}
+\footnotesize
+\begin{tabular}{lrr}
+\toprule
+ & GPT-2 & T5 \\
+\midrule
+Vocal mention on vocal reference & 234/247 (95\%) & 203/247 (82\%) \\
+Vocal mention on instrumental reference & 49/113 (43\%) & 33/113 (29\%) \\
+Overall vocal-mention rate & 65\% & 53\% \\
+``male vocalist'' phrase rate & 52\% & 47\% \\
+Female ref.\ $\rightarrow$ female caption & 40/71 (56\%) & 7/64 (11\%) \\
+Female ref.\ $\rightarrow$ male caption & 31/71 (44\%) & 57/64 (89\%) \\
+Male ref.\ $\rightarrow$ male caption & 130/136 (96\%) & 114/116 (98\%) \\
+Male ref.\ $\rightarrow$ female caption & 6/136 (4\%) & 2/116 (2\%) \\
+\bottomrule
+\end{tabular}
+\end{table}
