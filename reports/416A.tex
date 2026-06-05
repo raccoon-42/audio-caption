@@ -1,0 +1,151 @@
+\documentclass[9pt]{report}
+\usepackage[a4paper, margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+\usepackage[sfdefault]{roboto} % Roboto as a modern sans-serif alternative to Calibri
+\usepackage[T1]{fontenc}
+
+\renewcommand{\bibname}{REFERENCES}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\thepage}
+
+% Style chapter and section titles
+\titleformat{\chapter}[block]{\sffamily\bfseries\LARGE}{\thechapter.}{1em}{}
+\titleformat{\section}[block]{\sffamily\bfseries\Large}{\thesection}{1em}{}
+
+\begin{document}
+
+%---------------------- Title Page ----------------------%
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+
+    {\Huge \sffamily \textbf{TITLE OF THE PROJECT} \par}
+    \vspace{4cm}
+
+    {\large
+    \sffamily Team Members:\par
+    Student 1 Name \quad Student 1 ID \par
+    Student 2 Name \quad Student 2 ID \par
+    }
+
+    \vspace{1cm}
+    {\large \sffamily Advisor: Prof. Dr. XX }
+
+    \vspace{8cm}
+
+    {\large \sffamily
+    A Thesis Report Submitted to the \\
+    Faculty of Engineering in Partial Fulfilment of the \\
+    Requirements for the Degree of
+    }
+
+    \vspace{0.5cm}
+    {\LARGE \sffamily \textbf{BACHELOR OF SCIENCE}}
+
+    \vspace{0.5cm}
+    \sffamily (Academic Project)
+
+    \vspace{1cm}
+    \sffamily Department of Computer Engineering \\
+    İzmir Institute of Technology \\
+    İzmir, Turkey \\
+    June, 2026
+
+\end{titlepage}
+
+%---------------------- Abstract ----------------------%
+\chapter*{Abstract}
+%\addcontentsline{toc}{chapter}{Abstract}
+
+% Provide a short summary of the entire project to present the key points.
+% Limit to 150–250 words. Avoid citations and technical jargon.
+
+\vspace{0.5cm}
+
+\noindent \textbf{Keywords:} Keyword 1, Keyword 2, Keyword 3, Keyword 4
+
+%---------------------- Table of Contents ----------------------%
+\tableofcontents
+\newpage
+
+%---------------------- Introduction ----------------------%
+\chapter{INTRODUCTION}
+
+% Introduce the project, motivate the problem, state research contributions, and outline the structure of the report.
+
+%---------------------- Related Work ----------------------%
+\chapter{RELATED WORK}
+
+% Provide the related literature and relevant discussion about the novelty of your project.
+% Summarize key papers, tools, or systems that are relevant to your problem.
+% Identify gaps or limitations in existing solutions that your project addresses.
+
+%---------------------- Research Methodology ----------------------%
+\chapter{RESEARCH METHODOLOGY}
+
+% Describe the overall approach and the technical design of your solution.
+% Explain your methodology or design decisions in detail. 
+% Include system architecture, data flow diagrams, algorithms, or implementation steps if relevant.
+
+%---------------------- Experimental Study ----------------------%
+\chapter{EXPERIMENTAL STUDY}
+
+% Present experiments, evaluation setup, and performance analysis.
+% Describe the test environment (hardware, software, datasets).
+% Define metrics used for evaluation (accuracy, latency, etc.).
+% Present results clearly using tables, charts, or graphs. Discuss what the results show, the underlying reasons.
+
+%---------------------- Conclusions and Future Work ----------------------%
+\chapter{CONCLUSIONS AND FUTURE WORK}
+
+% Summarize the contributions of the project and suggest directions for further development.
+\chapter*{ALIGNMENT WITH UN SUSTAINABLE DEVELOPMENT GOALS}
+\addcontentsline{toc}{chapter}{ALIGNMENT WITH UN SUSTAINABLE DEVELOPMENT GOALS}  
+%The project should be evaluated and related (if applicable) by considering its social, health, security, economic, sustainability, and environmental impact in the context of the United Nations Sustainable Development Goals (SDG) (https://turkiye.un.org/tr/sdgs). The impact may be direct or indirect. You can use the questions given as examples to help in the evaluation of the impact areas, or you can explain the impacts based on your questions or perspective.
+\begin{table}[h]
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Impact Area}                     & \textbf{\begin{tabular}[c]{@{}l@{}}Does project impact?\\ Direct or indirect?\end{tabular}} & \textbf{Impact Definition}  \\ \hline
+\begin{tabular}[c]{@{}l@{}}\textbf{Social}\\ (How does the project affect people and society?\\ Who benefits from the project?\\ Does it improve accessibility, inclusion, or equality?\\ Does it reduce manual effort or improve quality of life?)\\ \\ SDG 10 - Reduced Inequalities\end{tabular}                         & Social impact                                                                               & Social definition          \\ \hline
+\begin{tabular}[c]{@{}l@{}}\textbf{Health}\\ (How does the project affect health directly or indirectly? \\ Does it reduce stress, workload, or human error?\\ Does it support health monitoring, safety, or well-being?\\ Does it prevent unsafe working conditions?)\\ \\ SDG 3 - Good Health and Well-being\end{tabular} & Health impact & Health definition    \\ \hline  
+
+\begin{tabular}[c]{@{}l@{}}\textbf{Security}\\ (How is security achieved in the project, \\ , or how does the project increase the security?\\ How is user data protected?\\ What security risks exist?)\\ \\ SDG 16 - Peace, Justice, and Strong Institutions\end{tabular} & Security impact & Security definition    \\ \hline 
+
+\begin{tabular}[c]{@{}l@{}}\textbf{Economic}\\ (How does the project contribute to the economy? \\ Does it reduce costs?\\ Does it improve productivity?)\\ \\ SDG 8 - Decent Work and Economic Growth\end{tabular} & Economic impact & Economic definition    \\ \hline 
+
+\begin{tabular}[c]{@{}l@{}}\textbf{Sustainability and Environment}\\ (How does the project contribute to the sustainability, \\ and affect the environment? \\ Does it reduce paper usage?\\ Does it optimize energy or resource consumption? \\ Is computer system usage efficient?)\\ \\ SDG 11 - Sustainable cities and communities \\ SDG 13 - Climate Action \\ SDG 12 - Responsible Consumption and Production \end{tabular} & Environment impact & Environment definition    \\ \hline 
+
+\end{tabular}
+
+
+\end{table}
+
+%---------------------- References ----------------------%
+\begin{thebibliography}{9}
+\addcontentsline{toc}{chapter}{REFERENCES}
+\bibitem{ref1}
+Author Name, \textit{Title of Paper/Book}, Journal/Publisher, Year.
+
+\bibitem{ref2}
+...
+
+\end{thebibliography}
+
+%---------------------- Appendix ----------------------%
+\appendix
+\chapter{APPENDIX}
+
+% Provide supplementary material that supports the report but is too detailed for the main sections. 
+% Include additional diagrams, tables, code snippets, and configuration files, that are referenced but not essential to follow the main text. 
+% You can explain reproducibility steps if you provide source code and other configuration options to produce the results given in your report.
+
+\end{document}
