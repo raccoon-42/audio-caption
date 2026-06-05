@@ -49,8 +49,9 @@ run-to-run variance. We find that (i) the two LMs are statistically indistinguis
 baseline once the noise floor is accounted for; (ii) second-stage fine-tuning erases nearly all
 architectural differences introduced in the projection stage; (iii) the largest decoding lever,
 sentence completion, improves \fense{} mostly by removing the fluency-error term rather than by
-improving semantics; and (iv) qualitatively the models capture genre, instrumentation and mood
-well but share a systematic bias toward hallucinating a vocalist. We frame the work as an
+improving semantics; and (iv) the models capture genre, instrumentation and mood
+well but share a systematic male-vocalist bias, which we trace to caption-prior amplification
+under uncertain audio evidence rather than to a missing audio cue. We frame the work as an
 efficiency- and analysis-oriented study of the minimum viable architecture for music captioning,
 not a state-of-the-art claim. Code is available at
 \href{https://github.com/raccoon-42/audio-caption}{\texttt{github.com/raccoon-42/audio-caption}}.
@@ -80,14 +81,16 @@ The contributions of this paper are:
         single-run ablation deltas are interpretable rather than anecdotal.
   \item A controlled comparison of a decoder-only (GPT-2) and an encoder--decoder (T5) LM, with
         ablations over projection architecture and decoding strategy.
-  \item An honest qualitative analysis, including a reproducible vocalist-hallucination failure
-        mode that we trace to the general-purpose audio frontend.
+  \item A qualitative and statistical analysis of a recurring vocalist bias, which we trace to
+        caption-prior amplification under uncertain audio evidence rather than to the audio
+        frontend alone.
 \end{itemize}
 
-We state up front what this paper is \emph{not}: it is not a state-of-the-art system, and we do
-not compare our numbers against systems evaluated on different datasets
-(Section~\ref{sec:related}). The value is the controlled analysis and the efficiency of the
-recipe --- only a small projection (plus the LM) is trained.
+This paper does not claim state-of-the-art performance. Published captioning systems are
+evaluated on different datasets with different reference counts, so a numerical comparison
+would be meaningless (Section~\ref{sec:related}), and we do not attempt one. The contribution
+is the controlled analysis itself, together with the efficiency of the recipe --- only a small
+projection (plus the LM) is trained.
 
 \section{Related Work}\label{sec:related}
 
@@ -310,10 +313,28 @@ Table~\ref{tab:qual} shows representative successes and failures. The models rel
 high-level musical content --- genre (rock, jazz, electronic), instrumentation (electric guitar,
 bass, drums, piano) and mood (groovy, energetic, emotional). Two failure modes recur: on
 \emph{non-music} audio the pipeline still emits a confident music caption, and greedy decoding
-occasionally degenerates into verbatim repetition. Most strikingly, both models default to
-describing ``a male vocalist singing melodically'' even when the reference is instrumental or
-explicitly states there is no singer. We attribute this vocal-presence blind spot to the
-general-purpose audio frontend and the strong language prior of the caption template.
+occasionally degenerates into verbatim repetition. Most strikingly, both models tend to insert ``a male
+vocalist singing melodically'' even when the reference explicitly states there is no singer.
+
+To characterise this we measured vocal-presence and vocalist-gender agreement over the full
+test set. The bias is \emph{not} a blind spot: GPT-2 mentions vocals on 95\% of clips whose
+reference describes singing, but also on 43\% of clips marked instrumental (T5: 82\%\,/\,29\%)
+--- both models track vocal presence well above chance while skewing toward false positives.
+The skew mirrors the training captions, of which 53\% mention vocals and in which male
+vocalists outnumber female ones 2.2:1; the phrase ``male vocalist'' appears in 10\% of training
+captions but in roughly half of the generated ones. Gender is worse: on references describing a
+\emph{female} singer, T5 outputs ``male'' 89\% of the time and GPT-2 44\%, while male
+references are almost never misgendered (2--4\%). These rates persist across decoding
+configurations, so they are not a decoding artifact.
+
+To separate the frontend from the LM, we probed the frozen \clapenc{} embeddings directly with
+zero-shot text prompts: vocal vs.\ instrumental is separable at 74\% accuracy and vocalist
+gender at 76\% (female recall only 55\%). The embedding therefore carries the relevant cues,
+but noisily --- and since both LMs read the \emph{same} embedding, the gap between GPT-2
+(56\%) and T5 (11\%) in female-vocalist accuracy shows the failure is largely model-side. We
+conclude that the vocalist bias is caption-prior amplification under uncertain audio evidence,
+not a missing audio cue: a music-specialised encoder should sharpen the evidence, but the
+male-vocalist default itself is learned from the caption statistics.
 
 \input{tables/paper_qualitative.tex}
 
@@ -322,8 +343,9 @@ general-purpose audio frontend and the strong language prior of the caption temp
 
 \textbf{General-purpose audio frontend.} Our encoder is trained on general audio, not music. A
 music-specialised encoder (a music \clapenc{} checkpoint, MERT~\cite{li2024mert} or
-MusicFM~\cite{won2024musicfm}) is a natural and likely beneficial swap, especially for the fine-grained attributes (vocal presence, instrument
-identity) where the model is weakest.
+MusicFM~\cite{won2024musicfm}) is a natural and likely beneficial swap, especially for the
+fine-grained attributes (vocalist gender, instrument identity) where the embedding's cues are
+noisiest (Section~\ref{sec:qual}).
 
 \textbf{Capacity vs.\ data.} Scaling the LM is not free in this low-data regime
 ($\sim$4.5k clips). In preliminary runs a billion-parameter decoder fine-tuned end-to-end
@@ -349,10 +371,11 @@ encoder, the projection, the data split and the evaluation fixed, we found that 
 and an encoder--decoder LM are statistically indistinguishable at baseline once run-to-run
 variance is measured; that second-stage fine-tuning erases projection-level differences; and
 that the largest decoding lever improves the primary metric mostly by removing a fluency penalty
-rather than by improving semantics. A reproducible vocalist hallucination points to the
-general-purpose audio frontend as the next thing to improve. The results characterise the
-minimum viable architecture for music captioning and the care needed to interpret its metrics,
-rather than chasing state of the art.
+rather than by improving semantics. A reproducible vocalist bias turns out to be
+caption-prior amplification under uncertain audio evidence; sharpening that evidence with a
+music-specialised frontend is the natural next step. The results characterise the minimum
+viable architecture for music captioning and the care needed to interpret its metrics, rather
+than chasing state of the art.
 
 {\small
 \hypersetup{linkcolor=red}  % back-reference page numbers in red (scoped to the bibliography)

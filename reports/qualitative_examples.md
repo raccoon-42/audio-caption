@@ -35,15 +35,15 @@ _Why it works:_ Drum & bass / electronic: both land the electronic family (techn
 
 _Why it works:_ Rock with flat male vocal: GPT-2 closely mirrors the reference's texture -- flat + harmonizing male vocals, hi-hats, kick/snare, groovy bass, energetic.
 
-### Clip 273
+### Clip 232 (replaced clip 273, where T5 mis-gendered the vocalist -- not a T5 success)
 
-**Reference:** A female singer sings this emotional melody. The song is medium tempo with guitar strumming rhythm, strong bass line, steady drumming rhythm, keyboard accompaniment and sound effects. The song is emotional and romantic. The song is a euro pop love song and has poor audio quality.
+**Reference:** A female vocalist sings this melancholic melody in a foreign language. The tempo is slow with a romantic piano accompaniment. The song is soft, mellow, poignant, emotional, sentimental, romantic, melancholic, sad, lonely, and wistful. This song is a Pop/ Love song.
 
-**GPT-2:** A female vocalist sings this soft melody. The tempo is medium with a keyboard accompaniment, steady drumming, steady bass line and keyboard accompaniment. The song is mellow, soft, mellifluous, emotional, sentimental, melancholic and romantic.
+**GPT-2:** This is a lullaby piece. There is a female vocalist singing melodically. The piano is playing a simple tune while the bass guitar is playing in the background. The atmosphere is calming and relaxing. This piece could be used in the background of a meditation video.
 
-**T5:** This is a mellow, soft rock piece. There is a male vocalist singing melodically. The melody is being played by the electric guitar while the bass guitar is playing in the background. The rhythm is provided by a simple acoustic drum beat.
+**T5:** This is a classical music piece. There is a female vocalist singing melodically. The melody is being played by the piano while the rhythm is being played by the acoustic guitar. The atmosphere is romantic.
 
-_Why it works:_ Emotional euro-pop: GPT-2 correctly identifies a FEMALE vocalist, medium tempo and emotional/romantic mood (T5 mis-genders as male).
+_Why it works:_ Slow piano love song: BOTH models correctly identify the FEMALE vocalist (rare for T5: only 7/64 female references are gendered correctly), the piano, and the soft/romantic mood. One of the few both-correct female examples; see scripts/analyze_vocal_bias.py for the full statistics.
 
 ### Clip 86
 
