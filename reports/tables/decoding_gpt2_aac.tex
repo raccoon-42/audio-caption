@@ -1,6 +1,6 @@
 \begin{table}[ht]
 \centering
-\caption{GPT2 decoding ablations --- top 15 by FENSE, AAC-specific metrics. First row = greedy baseline.}
+\caption{GPT-2 decoding ablations --- top 15 by FENSE, AAC-specific metrics. The greedy row is the baseline; its $\pm$ is the run-to-run training noise floor, shown for context only --- all rows decode the same checkpoint, so differences between configurations are exact.}
 \label{tab:decoding_gpt2_aac}
 \footnotesize
 \resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%
@@ -8,7 +8,7 @@
 \toprule
 Config & SBERT-sim $\uparrow$ & FER $\downarrow$ & FENSE $\uparrow$ \\
 \midrule
-gpt2 & 0.5820 $\pm$0.0089 & 0.3478 $\pm$0.0272 & 0.3998 $\pm$0.0137 \\
+greedy & 0.5820 $\pm$0.0089 & 0.3478 $\pm$0.0272 & 0.3998 $\pm$0.0137 \\
 trim\_ngram2 & 0.5807 & 0.0019 & \textbf{0.5796} \\
 trim\_rep1.2\_ngram2\_t0.3 & 0.5812 & 0.0076 & 0.5775 \\
 trim\_rep1.2\_ngram2 & 0.5766 & \textbf{0.0000} & 0.5766 \\

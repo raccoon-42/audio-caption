@@ -79,7 +79,7 @@ def fig_training_curves():
                 lw, z = (2.2, 5) if label == "baseline" else (1.0, 2)
                 ax.plot(ep, vl, marker="", linewidth=lw, zorder=z,
                         label=label, color="black" if label == "baseline" else None)
-            ax.set_title(f"{NAMES[model]} -- Stage {stage}")
+            ax.set_title(f"{NAMES[model]} — Stage {stage}")
             ax.grid(True, alpha=0.3)
             if c == 0:
                 ax.set_ylabel("Val loss")
@@ -121,7 +121,7 @@ def fig_arch_noisefloor():
         ax.set_title(f"{NAMES[model]} architecture ablations")
         ax.set_ylim(min(vals) - 2 * std - 0.01, max(vals) + 2 * std + 0.01)
         if c == 0:
-            ax.set_ylabel("FENSE")
+            ax.set_ylabel(r"FENSE $\uparrow$")
         ax.legend(fontsize=6, loc="upper left")
         ax.grid(True, axis="y", alpha=0.3)
     fig.tight_layout()
@@ -154,7 +154,7 @@ def fig_decoding_fense_fer():
         ax.scatter(trim_x, trim_y, s=18, color="tab:blue", alpha=0.8, label="trimmed")
         ax.scatter([bm["FER"]], [bm["FENSE"]], s=70, marker="*", color="black",
                    zorder=5, label="greedy baseline")
-        ax.set_title(f"{NAMES[model]} decoding configs")
+        ax.set_title(f"{NAMES[model]} decoding configs ($\\leftarrow\\,\\uparrow$ better)")
         ax.set_xlabel("FER (fluency-error rate)")
         if c == 0:
             ax.set_ylabel("FENSE")
@@ -205,14 +205,13 @@ def fig_baseline_groups():
 # --------------------------------------------------------------------------- #
 def fig_decoding_groups(top_n=8):
     cmap = plt.get_cmap("tab10")
-    # FER gets its own panel: its near-zero values (trimmed configs) would
-    # otherwise share an axis with the 0.5-0.6 similarity scores and crush
-    # their resolution.
-    panels = [("Legacy metrics", LEGACY_METRICS),
-              ("AAC metrics", ["SBERT-sim", "FENSE"]),
-              (r"FER $\downarrow$", ["FER"])]
-    fig, axes = plt.subplots(len(MODELS), 3, figsize=(7.0, 6.0), squeeze=False,
-                             gridspec_kw={"width_ratios": [7, 2.4, 1.6]})
+    # One section per model (bold model-name title), panels stacked beneath:
+    # Legacy metrics full-width on top, AAC + FER side by side below. FER gets
+    # its own panel: its near-zero values (trimmed configs) would otherwise
+    # share an axis with the 0.5-0.6 similarity scores and crush their
+    # resolution.
+    fig = plt.figure(figsize=(7.0, 9.2), layout="constrained")
+    subfigs = fig.subfigures(len(MODELS), 1)
     for r, model in enumerate(MODELS):
         base = load(RESULTS / model / "ablations" / "arch" / f"{model}_ablation_{model}.json")["metrics"]
         configs = []
@@ -224,44 +223,56 @@ def fig_decoding_groups(top_n=8):
                 configs.append((tag, m))
         configs.sort(key=lambda kv: kv[1]["FENSE"], reverse=True)
         rows = [("greedy", base)] + configs[:top_n]
-        for c, (gtitle, gmetrics) in enumerate(panels):
-            ax = axes[r][c]
-            n_m = len(gmetrics)
-            if gtitle == "AAC metrics":
-                # point plot on a zoomed (non-zero) axis: similarity scores
-                # cluster in a narrow band, and truncated bars would distort
-                # proportions while markers do not.
-                lo, hi = 1.0, 0.0
-                for j, met in enumerate(gmetrics):
-                    vals = [m.get(met) for _, m in rows]
-                    lo, hi = min(lo, min(vals)), max(hi, max(vals))
-                    ax.plot(range(len(rows)), vals, marker="o" if j == 0 else "s",
-                            markersize=4, linewidth=0.8, linestyle="--",
-                            color=cmap(j % 10), label=met)
-                pad = (hi - lo) * 0.18 + 0.005
-                ax.set_ylim(lo - pad, hi + pad)
-            else:
-                width = 0.8 / n_m
-                top = 0.0
-                for j, met in enumerate(gmetrics):
-                    vals = [m.get(met, 0) for _, m in rows]
-                    top = max(top, max(vals))
-                    xs = [i + (j - (n_m - 1) / 2) * width for i in range(len(rows))]
-                    color = "tab:red" if met == "FER" else cmap(j % 10)
-                    ax.bar(xs, vals, width, color=color, label=met)
-                ax.set_ylim(0, top * 1.3)   # headroom so the legend clears the bars
-            ax.set_xticks(range(len(rows)))
-            if len(gmetrics) == 1:
-                # config order matches the adjacent panel; labels would not fit
-                ax.set_xticklabels(["" for _ in rows])
-            else:
-                ax.set_xticklabels([t for t, _ in rows], rotation=55, ha="right", fontsize=5)
-            ax.set_title(f"{NAMES[model]} -- {gtitle}", fontweight="bold", fontsize=8)
-            ax.grid(True, axis="y", alpha=0.3)
-            if len(gmetrics) > 1:
-                ax.legend(fontsize=5, ncol=4 if n_m > 4 else 2,
-                          loc="upper center" if gtitle != "AAC metrics" else "lower right")
-    fig.tight_layout()
+        labels = [t for t, _ in rows]
+
+        sf = subfigs[r] if len(MODELS) > 1 else subfigs
+        sf.suptitle(NAMES[model], fontweight="bold", fontsize=11)
+        gs = sf.add_gridspec(2, 2, width_ratios=[2.6, 1.4])
+        ax_leg = sf.add_subplot(gs[0, :])
+        ax_aac = sf.add_subplot(gs[1, 0])
+        ax_fer = sf.add_subplot(gs[1, 1])
+
+        # Legacy metrics: grouped bars, full width
+        n_m = len(LEGACY_METRICS)
+        width = 0.8 / n_m
+        top = 0.0
+        for j, met in enumerate(LEGACY_METRICS):
+            vals = [m.get(met, 0) for _, m in rows]
+            top = max(top, max(vals))
+            xs = [i + (j - (n_m - 1) / 2) * width for i in range(len(rows))]
+            ax_leg.bar(xs, vals, width, color=cmap(j % 10), label=met)
+        ax_leg.set_ylim(0, top * 1.3)   # headroom so the legend clears the bars
+        ax_leg.set_xticks(range(len(rows)))
+        ax_leg.set_xticklabels(labels, rotation=25, ha="right", fontsize=6)
+        ax_leg.set_title(r"Legacy metrics $\uparrow$", fontweight="bold", fontsize=8)
+        ax_leg.grid(True, axis="y", alpha=0.3)
+        ax_leg.legend(fontsize=5, ncol=4, loc="upper center")
+
+        # AAC metrics (similarity scores): point plot on a zoomed (non-zero)
+        # axis -- the values cluster in a narrow band, and truncated bars
+        # would distort proportions while markers do not.
+        lo, hi = 1.0, 0.0
+        for j, met in enumerate(["SBERT-sim", "FENSE"]):
+            vals = [m.get(met) for _, m in rows]
+            lo, hi = min(lo, min(vals)), max(hi, max(vals))
+            ax_aac.plot(range(len(rows)), vals, marker="o" if j == 0 else "s",
+                        markersize=4, linewidth=0.8, linestyle="--",
+                        color=cmap(j % 10), label=met)
+        pad = (hi - lo) * 0.18 + 0.005
+        ax_aac.set_ylim(lo - pad, hi + pad)
+        ax_aac.set_xticks(range(len(rows)))
+        ax_aac.set_xticklabels(labels, rotation=40, ha="right", fontsize=5)
+        ax_aac.set_title(r"AAC metrics (excl. FER) $\uparrow$", fontweight="bold", fontsize=8)
+        ax_aac.grid(True, axis="y", alpha=0.3)
+        ax_aac.legend(fontsize=5, ncol=2, loc="lower right")
+
+        # FER: own scale; config order matches the AAC panel
+        vals = [m.get("FER", 0) for _, m in rows]
+        ax_fer.bar(range(len(rows)), vals, 0.8, color="tab:red")
+        ax_fer.set_xticks(range(len(rows)))
+        ax_fer.set_xticklabels(["" for _ in rows])
+        ax_fer.set_title(r"FER $\downarrow$", fontweight="bold", fontsize=8)
+        ax_fer.grid(True, axis="y", alpha=0.3)
     fig.savefig(OUT / "fig_decoding_groups.pdf")
     plt.close(fig)
     print("wrote fig_decoding_groups.pdf")

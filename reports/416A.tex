@@ -376,8 +376,8 @@ baseline.}
 \section{Decoding ablations}\label{sec:decoding}
 Decoding strategies are evaluated on the fixed baseline checkpoint (no retraining), isolating
 generation behaviour. Figure~\ref{fig:decoding_groups} shows the top configurations by
-\fense{} per model, again split into \textbf{Legacy metrics} and \textbf{AAC metrics} panels
-so each group can be read at its own resolution (full tables in the appendix,
+\fense{} per model, split into \textbf{Legacy metrics}, \textbf{AAC metrics} and a separate
+FER panel so each group can be read at its own resolution (full tables in the appendix,
 Tables~\ref{tab:decoding_gpt2_legacy}--\ref{tab:decoding_t5_aac}). The dominant lever is
 trimming trailing incomplete sentences: it lifts \fense{} from $0.3998$ to $0.5796$ for GPT-2
 and from $0.3954$ to $0.5762$ for T5.
@@ -402,9 +402,9 @@ high \fense{} without improving semantic similarity. The star is greedy decoding
 \begin{figure}[htbp]\centering
 \includegraphics[width=\textwidth]{figures/fig_decoding_groups.pdf}
 \caption{Decoding-ablation metrics per model (greedy baseline plus top
-configurations by \fense{}), grouped into \textbf{Legacy metrics} (left),
-\textbf{AAC metrics} (centre) and \textbf{FER} (right) panels, each at its own
-scale. The AAC panel uses markers on a zoomed (non-zero) axis to resolve the
+configurations by \fense{}). Each model section shows \textbf{Legacy metrics}
+(top, full width), with \textbf{AAC metrics excluding FER} (bottom left) and
+\textbf{FER} (bottom right) beneath, each panel at its own scale. The AAC panel uses markers on a zoomed (non-zero) axis to resolve the
 narrow 0.55--0.58 band of the trimmed configurations; FER is separated because
 its near-zero trimmed values would otherwise compress that axis, and its bars
 follow the same configuration order as the adjacent panel. The flat SBERT-sim
@@ -419,7 +419,12 @@ Table~\ref{tab:qual} shows representative successes and failures. The models rel
 high-level musical content --- genre (rock, jazz, electronic), instrumentation (electric guitar,
 bass, drums, piano) and mood (groovy, energetic, emotional). Two failure modes recur: on
 \emph{non-music} audio the pipeline still emits a confident music caption, and greedy decoding
-occasionally degenerates into verbatim repetition. Most strikingly, both models tend to insert
+occasionally degenerates into verbatim repetition. Notably, degeneration and semantic accuracy
+co-occur: in the bowl-tone example both models correctly capture the sound itself --- a
+resonating bowl, rubbed or struck, with a meditative mood --- yet both repeat themselves, T5
+collapsing into the same sentence four times over and GPT-2 duplicating its final sentence.
+On non-music audio the spurious male vocalist appears only in GPT-2's printer caption; T5
+instead invents a plausible non-vocal scene (a DJ scratching). Most strikingly, both models tend to insert
 ``a male vocalist singing melodically'' even when the reference explicitly states there is no
 singer.
 
@@ -652,9 +657,9 @@ precomputation), per-model learning-rate search, baseline training, noise-floor 
 replication, architecture ablations, decoding ablations and shared evaluation. Dependencies are
 managed with \texttt{uv}; evaluation additionally requires a Java runtime (JDK~11) and a
 one-time \texttt{aac-metrics-download} for the CoreNLP-backed metrics. Every table and figure
-in this report is generated from the result JSONs by \texttt{scripts/make\_paper\_tables.py},
-\texttt{scripts/make\_report\_tables.py} and \texttt{scripts/make\_report\_figures.py}; the
-vocalist-bias statistics come from \texttt{scripts/analyze\_vocal\_bias.py}.
+in this report is generated from the result JSONs by the scripts under
+\texttt{scripts/reporting/}: \texttt{thesis\_tables.py} and \texttt{figures.py};
+the vocalist-bias statistics come from \texttt{scripts/reporting/vocal\_bias.py}.
 \end{sloppypar}
 
 \section{Noise-floor detail}
@@ -669,8 +674,12 @@ Tables~\ref{tab:baseline_legacy} and~\ref{tab:baseline_aac}.
 Best validation loss per configuration, shown separately for Stage~1 and Stage~2 (the spread
 collapse discussed in Section~\ref{sec:stages}).
 
+\subsection*{GPT-2}
 \input{tables/s1_valloss_gpt2.tex}
 \input{tables/s2_valloss_gpt2.tex}
+
+\FloatBarrier
+\subsection*{T5}
 \input{tables/s1_valloss_t5.tex}
 \input{tables/s2_valloss_t5.tex}
 
@@ -694,8 +703,12 @@ zero-shot probe of the frozen audio embeddings.
 \FloatBarrier
 \section{Full architecture-ablation metrics}
 
+\subsection*{GPT-2}
 \input{tables/arch_gpt2_legacy.tex}
 \input{tables/arch_gpt2_aac.tex}
+
+\FloatBarrier
+\subsection*{T5}
 \input{tables/arch_t5_legacy.tex}
 \input{tables/arch_t5_aac.tex}
 
@@ -704,8 +717,12 @@ zero-shot probe of the frozen audio embeddings.
 Exact values behind Figure~\ref{fig:decoding_groups}, split into
 \textbf{Legacy metrics} and \textbf{AAC metrics}.
 
+\subsection*{GPT-2}
 \input{tables/decoding_gpt2_legacy.tex}
 \input{tables/decoding_gpt2_aac.tex}
+
+\FloatBarrier
+\subsection*{T5}
 \input{tables/decoding_t5_legacy.tex}
 \input{tables/decoding_t5_aac.tex}
 

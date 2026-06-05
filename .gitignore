@@ -23,3 +23,6 @@ results/
 .vscode/
 .idea/
 *.brf
+*.toc
+*.out
+*.brf

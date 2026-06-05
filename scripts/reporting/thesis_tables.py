@@ -16,8 +16,8 @@ Metric columns are split into two tables following the aac-metrics taxonomy:
   - aac    : SBERT-sim, FER, FENSE
 
 Usage:
-    uv run python scripts/make_report_tables.py
-    uv run python scripts/make_report_tables.py --models gpt2 t5 --top-decoding 15
+    uv run python scripts/reporting/thesis_tables.py
+    uv run python scripts/reporting/thesis_tables.py --models gpt2 t5 --top-decoding 15
 """
 
 import argparse
@@ -255,7 +255,7 @@ def spread_collapse_table(path, all_train_rows, models):
 
 def noise_floor_table(path, seeds, nf, metrics, model, caption, label):
     present = [m for m in metrics if m in nf]
-    header = ["Seed"] + present
+    header = ["Seed"] + [with_arrow(m) for m in present]
     rows = []
     for seed in seeds:
         cells = [str(seed)]
@@ -345,13 +345,14 @@ def main():
 
     # ---- per-model tables ----
     for model in args.models:
+        disp = MODEL_NAMES.get(model, model.upper())
         # noise floor
         seeds, nf = load_noise_floor(results_dir, model)
         if nf:
             p = out_dir / f"noise_floor_{model}.tex"
             tex = noise_floor_table(
                 p, seeds, nf, ALL_METRICS, model,
-                f"{model.upper()} run-to-run variance over seeds {seeds} "
+                f"{disp} run-to-run variance over seeds {seeds} "
                 f"(std = noise floor).",
                 f"tab:noise_{model}")
             written.append(p); emit(tex, f"noise_floor_{model}")
@@ -367,7 +368,7 @@ def main():
             p = out_dir / f"s{stage}_valloss_{model}.tex"
             spread = valloss_table(
                 p, train_rows, stage, model,
-                f"{model.upper()} stage-{stage} best validation loss per config",
+                f"{disp} stage-{stage} best validation loss per config",
                 f"tab:s{stage}_valloss_{model}")
             if spread is not None:
                 written.append(p)
@@ -383,7 +384,7 @@ def main():
                 p = out_dir / f"arch_{model}_{gname}.tex"
                 tex = metric_table(
                     p, arch, gmetrics, order, model, nf,
-                    f"{model.upper()} architecture ablations (greedy) --- "
+                    f"{disp} architecture ablations (greedy) --- "
                     f"{GROUP_TITLES[gname]}. Best per column in bold; "
                     f"baseline row shows $\\pm$ noise floor.",
                     f"tab:arch_{model}_{gname}")
@@ -396,16 +397,19 @@ def main():
             order = []
             base_row = {}
             if model in arch:                   # greedy baseline lives in arch dir
-                base_row = {model: arch[model]}
-                order.append(model)
+                base_row = {"greedy": arch[model]}
+                order.append("greedy")
             order += [t for t in top if t != model]
-            merged = {**base_row, **{t: dec[t] for t in top}}
+            merged = {**base_row, **{t: dec[t] for t in top if t != model}}
             if order:
                 p = out_dir / f"decoding_{model}_{gname}.tex"
                 tex = metric_table(
-                    p, merged, gmetrics, order, model, nf,
-                    f"{model.upper()} decoding ablations --- top {args.top_decoding} "
-                    f"by {PRIMARY}, {GROUP_TITLES[gname]}. First row = greedy baseline.",
+                    p, merged, gmetrics, order, "greedy", nf,
+                    f"{disp} decoding ablations --- top {args.top_decoding} "
+                    f"by {PRIMARY}, {GROUP_TITLES[gname]}. The greedy row is the "
+                    f"baseline; its $\\pm$ is the run-to-run training noise floor, "
+                    f"shown for context only --- all rows decode the same "
+                    f"checkpoint, so differences between configurations are exact.",
                     f"tab:decoding_{model}_{gname}")
                 written.append(p); emit(tex, f"decoding_{model}_{gname}")
 

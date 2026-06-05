@@ -84,6 +84,7 @@ uv run python scripts/evaluate.py --stage 2 --model gpt2 --ckpt-tag gpt2_seed44
 | Evaluation | `scripts/evaluate.py` | Generates captions and computes metrics |
 | Arch ablations | `scripts/run_arch_ablations.sh` | Trains + evals 6 arch configs per model |
 | Decoding ablations | `scripts/run_decoding_ablations.sh` | Eval-only, ~23 decoding configs per model |
+| Report artifacts | `scripts/reporting/*.py` | LaTeX table fragments and figures generated from `results/` |
 
 ## Ablations
 
@@ -128,8 +129,14 @@ scripts/
   run_arch_ablations.sh    Train + eval arch ablations (6 configs/model)
   run_decoding_ablations.sh  Eval-only decoding ablations (~23 configs/model)
   noise_floor.py           Compute noise floor stats from seed results
+  reporting/               Report artifact generators (run from repo root)
+    thesis_tables.py         LaTeX table fragments for the thesis report
+    paper_tables.py          Lean table fragments for the two-column paper
+    figures.py               Result figures (vector PDF)
+    vocal_bias.py            Vocalist-bias statistics + tables
 data/                 Dataset and cached embeddings
 checkpoints/          Model checkpoints (per tag)
+reports/              LaTeX sources; generated tables/ and figures/
 results/              Structured results (per model):
   lr_search/            Optuna DBs, LR search JSONs, S1 projection .pt
   training/             Per-stage training history JSONs

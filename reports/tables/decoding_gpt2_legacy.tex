@@ -1,6 +1,6 @@
 \begin{table}[ht]
 \centering
-\caption{GPT2 decoding ablations --- top 15 by FENSE, Legacy metrics. First row = greedy baseline.}
+\caption{GPT-2 decoding ablations --- top 15 by FENSE, Legacy metrics. The greedy row is the baseline; its $\pm$ is the run-to-run training noise floor, shown for context only --- all rows decode the same checkpoint, so differences between configurations are exact.}
 \label{tab:decoding_gpt2_legacy}
 \footnotesize
 \resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%
@@ -8,7 +8,7 @@
 \toprule
 Config & BLEU-1 $\uparrow$ & BLEU-4 $\uparrow$ & METEOR $\uparrow$ & ROUGE-L $\uparrow$ & CIDEr-D $\uparrow$ & SPICE $\uparrow$ & SPIDEr $\uparrow$ \\
 \midrule
-gpt2 & 0.3091 $\pm$0.0019 & \textbf{0.0631 $\pm$0.0039} & \textbf{0.1265 $\pm$0.0041} & \textbf{0.2329 $\pm$0.0017} & \textbf{0.1109 $\pm$0.0076} & \textbf{0.1091 $\pm$0.0032} & \textbf{0.1100 $\pm$0.0024} \\
+greedy & 0.3091 $\pm$0.0019 & \textbf{0.0631 $\pm$0.0039} & \textbf{0.1265 $\pm$0.0041} & \textbf{0.2329 $\pm$0.0017} & \textbf{0.1109 $\pm$0.0076} & \textbf{0.1091 $\pm$0.0032} & \textbf{0.1100 $\pm$0.0024} \\
 trim\_ngram2 & \textbf{0.3171} & 0.0575 & 0.1210 & 0.2205 & 0.1092 & 0.1081 & 0.1087 \\
 trim\_rep1.2\_ngram2\_t0.3 & 0.2829 & 0.0454 & 0.1137 & 0.1970 & 0.1003 & 0.1062 & 0.1033 \\
 trim\_rep1.2\_ngram2 & 0.2810 & 0.0409 & 0.1124 & 0.1931 & 0.0959 & 0.1042 & 0.1000 \\

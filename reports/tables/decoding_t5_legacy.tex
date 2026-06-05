@@ -1,6 +1,6 @@
 \begin{table}[ht]
 \centering
-\caption{T5 decoding ablations --- top 15 by FENSE, Legacy metrics. First row = greedy baseline.}
+\caption{T5 decoding ablations --- top 15 by FENSE, Legacy metrics. The greedy row is the baseline; its $\pm$ is the run-to-run training noise floor, shown for context only --- all rows decode the same checkpoint, so differences between configurations are exact.}
 \label{tab:decoding_t5_legacy}
 \footnotesize
 \resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%
@@ -8,7 +8,7 @@
 \toprule
 Config & BLEU-1 $\uparrow$ & BLEU-4 $\uparrow$ & METEOR $\uparrow$ & ROUGE-L $\uparrow$ & CIDEr-D $\uparrow$ & SPICE $\uparrow$ & SPIDEr $\uparrow$ \\
 \midrule
-t5 & 0.3003 $\pm$0.0122 & \textbf{0.0574 $\pm$0.0048} & \textbf{0.1162 $\pm$0.0036} & \textbf{0.2275 $\pm$0.0027} & 0.0847 $\pm$0.0181 & 0.0866 $\pm$0.0124 & 0.0857 $\pm$0.0149 \\
+greedy & 0.3003 $\pm$0.0122 & \textbf{0.0574 $\pm$0.0048} & \textbf{0.1162 $\pm$0.0036} & \textbf{0.2275 $\pm$0.0027} & 0.0847 $\pm$0.0181 & 0.0866 $\pm$0.0124 & 0.0857 $\pm$0.0149 \\
 trim\_rep1.2 & \textbf{0.3045} & 0.0498 & 0.1158 & 0.2203 & 0.0863 & 0.0921 & 0.0892 \\
 trim\_beam5\_ngram2 & 0.1923 & 0.0428 & 0.0918 & 0.1967 & 0.0878 & 0.1013 & 0.0945 \\
 trim\_rep1.3 & 0.2934 & 0.0424 & 0.1124 & 0.2065 & 0.0779 & 0.0987 & 0.0883 \\
