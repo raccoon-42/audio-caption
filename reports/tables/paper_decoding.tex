@@ -1,0 +1,30 @@
+\begin{table*}[t]
+\centering
+\caption{Top decoding configurations per model (eval-only on the baseline checkpoint), ranked by \textsc{Fense}. Note that high \textsc{Fense} coincides with near-zero FER while lexical metrics (CIDEr-D, SPIDEr) barely move -- see Figure~\ref{fig:fensefer}.}
+\label{tab:decoding}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrrrr}
+\toprule
+Config & FENSE & SBERT-sim & FER & CIDEr-D & SPIDEr \\
+\midrule
+\multicolumn{6}{l}{\textbf{GPT-2}} \\
+greedy (baseline) & 0.3998 & 0.5820 & 0.3478 & 0.1109 & 0.1100 \\
+trim\_ngram2 & \textbf{0.5796} & 0.5807 & 0.0019 & 0.1092 & 0.1087 \\
+trim\_rep1.2\_ngram2\_t0.3 & 0.5775 & 0.5812 & 0.0076 & 0.1003 & 0.1033 \\
+trim\_rep1.2\_ngram2 & 0.5766 & 0.5766 & 0.0000 & 0.0959 & 0.1000 \\
+trim\_rep1.2\_ngram3 & 0.5766 & 0.5781 & 0.0019 & 0.0926 & 0.0986 \\
+trim\_rep1.2 & 0.5758 & 0.5774 & 0.0019 & 0.0924 & 0.0983 \\
+trim\_rep1.3 & 0.5723 & 0.5748 & 0.0057 & 0.0885 & 0.0938 \\
+\midrule
+\multicolumn{6}{l}{\textbf{T5}} \\
+greedy (baseline) & 0.3954 & 0.5564 & 0.3251 & 0.0847 & 0.0857 \\
+trim\_rep1.2 & \textbf{0.5762} & 0.5762 & 0.0000 & 0.0863 & 0.0892 \\
+trim\_beam5\_ngram2 & 0.5649 & 0.5698 & 0.0095 & 0.0878 & 0.0945 \\
+trim\_rep1.3 & 0.5640 & 0.5640 & 0.0000 & 0.0779 & 0.0883 \\
+trim\_rep1.2\_beam5\_ngram2 & 0.5618 & 0.5716 & 0.0189 & 0.0985 & 0.1004 \\
+trim\_rep1.2\_ngram2 & 0.5593 & 0.5593 & 0.0000 & 0.0662 & 0.0831 \\
+trim\_rep1.2\_ngram2\_t0.3 & 0.5591 & 0.5599 & 0.0019 & 0.0611 & 0.0792 \\
+\bottomrule
+\end{tabular}
+\end{table*}

@@ -1,0 +1,19 @@
+\begin{table}[ht]
+\centering
+\caption{T5 stage-2 best validation loss per config (spread = 0.0267).}
+\label{tab:s2_valloss_t5}
+\footnotesize
+\begin{tabular}{lrr}
+\toprule
+Config & Best val loss & Stopped epoch \\
+\midrule
+t5 & 1.8903 & 9 \\
+t5\_depth1 & 1.8929 & 9 \\
+t5\_depth3 & \textbf{1.8674} & 9 \\
+t5\_drop0.1 & 1.8941 & 8 \\
+t5\_drop0.5 & 1.8855 & 9 \\
+t5\_prefix16 & 1.8793 & 10 \\
+t5\_prefix4 & 1.8900 & 10 \\
+\bottomrule
+\end{tabular}
+\end{table}

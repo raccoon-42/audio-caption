@@ -1,0 +1,21 @@
+\begin{table}[ht]
+\centering
+\caption{GPT2 architecture ablations (greedy) --- Legacy metrics. Best per column in bold; baseline row shows $\pm$ noise floor.}
+\label{tab:arch_gpt2_legacy}
+\footnotesize
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%
+\begin{tabular}{lrrrrrrr}
+\toprule
+Config & BLEU-1 & BLEU-4 & METEOR & ROUGE-L & CIDEr-D & SPICE & SPIDEr \\
+\midrule
+gpt2 & 0.3091 $\pm$0.0019 & 0.0631 $\pm$0.0039 & 0.1265 $\pm$0.0041 & 0.2329 $\pm$0.0017 & 0.1109 $\pm$0.0076 & 0.1091 $\pm$0.0032 & 0.1100 $\pm$0.0024 \\
+gpt2\_depth1 & 0.3103 & 0.0631 & 0.1288 & 0.2339 & 0.1078 & \textbf{0.1164} & 0.1121 \\
+gpt2\_depth3 & 0.2951 & 0.0600 & 0.1255 & 0.2201 & 0.0952 & 0.1000 & 0.0976 \\
+gpt2\_drop0.1 & \textbf{0.3106} & 0.0696 & \textbf{0.1337} & \textbf{0.2371} & \textbf{0.1268} & 0.1152 & \textbf{0.1210} \\
+gpt2\_drop0.5 & 0.3052 & 0.0653 & 0.1297 & 0.2317 & 0.1080 & 0.1050 & 0.1065 \\
+gpt2\_prefix16 & 0.3093 & \textbf{0.0698} & 0.1324 & 0.2345 & 0.1235 & 0.1118 & 0.1177 \\
+gpt2\_prefix4 & 0.3101 & 0.0638 & 0.1307 & 0.2327 & 0.1020 & 0.1004 & 0.1012 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}

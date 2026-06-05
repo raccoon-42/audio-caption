@@ -1,0 +1,30 @@
+\begin{table}[ht]
+\centering
+\caption{T5 decoding ablations --- top 15 by FENSE, AAC-specific metrics. First row = greedy baseline.}
+\label{tab:decoding_t5_aac}
+\footnotesize
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%
+\begin{tabular}{lrrr}
+\toprule
+Config & SBERT-sim & FER & FENSE \\
+\midrule
+t5 & 0.5564 $\pm$0.0170 & \textbf{0.3251 $\pm$0.0511} & 0.3954 $\pm$0.0345 \\
+trim\_rep1.2 & \textbf{0.5762} & 0.0000 & \textbf{0.5762} \\
+trim\_beam5\_ngram2 & 0.5698 & 0.0095 & 0.5649 \\
+trim\_rep1.3 & 0.5640 & 0.0000 & 0.5640 \\
+trim\_rep1.2\_beam5\_ngram2 & 0.5716 & 0.0189 & 0.5618 \\
+trim\_rep1.2\_ngram2 & 0.5593 & 0.0000 & 0.5593 \\
+trim\_rep1.2\_ngram2\_t0.3 & 0.5599 & 0.0019 & 0.5591 \\
+trim\_rep1.3\_ngram2 & 0.5629 & 0.0113 & 0.5570 \\
+trim\_rep1.2\_ngram3 & 0.5546 & 0.0000 & 0.5546 \\
+trim\_rep1.5 & 0.5561 & 0.0057 & 0.5533 \\
+trim\_rep1.5\_ngram2 & 0.5558 & 0.0076 & 0.5522 \\
+trim\_rep1.3\_beam5 & 0.5728 & 0.0416 & 0.5500 \\
+trim\_ngram2 & 0.5485 & 0.0038 & 0.5470 \\
+trim\_rep1.2\_ngram2\_t48 & 0.5462 & 0.0000 & 0.5462 \\
+trim\_rep1.2\_beam5\_lp0.6 & 0.5716 & 0.0529 & 0.5443 \\
+trim\_incomplete & 0.5495 & 0.0189 & 0.5417 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}

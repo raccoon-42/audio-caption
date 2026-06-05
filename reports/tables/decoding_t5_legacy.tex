@@ -1,0 +1,30 @@
+\begin{table}[ht]
+\centering
+\caption{T5 decoding ablations --- top 15 by FENSE, Legacy metrics. First row = greedy baseline.}
+\label{tab:decoding_t5_legacy}
+\footnotesize
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%
+\begin{tabular}{lrrrrrrr}
+\toprule
+Config & BLEU-1 & BLEU-4 & METEOR & ROUGE-L & CIDEr-D & SPICE & SPIDEr \\
+\midrule
+t5 & 0.3003 $\pm$0.0122 & \textbf{0.0574 $\pm$0.0048} & \textbf{0.1162 $\pm$0.0036} & \textbf{0.2275 $\pm$0.0027} & 0.0847 $\pm$0.0181 & 0.0866 $\pm$0.0124 & 0.0857 $\pm$0.0149 \\
+trim\_rep1.2 & \textbf{0.3045} & 0.0498 & 0.1158 & 0.2203 & 0.0863 & 0.0921 & 0.0892 \\
+trim\_beam5\_ngram2 & 0.1923 & 0.0428 & 0.0918 & 0.1967 & 0.0878 & 0.1013 & 0.0945 \\
+trim\_rep1.3 & 0.2934 & 0.0424 & 0.1124 & 0.2065 & 0.0779 & 0.0987 & 0.0883 \\
+trim\_rep1.2\_beam5\_ngram2 & 0.1956 & 0.0442 & 0.0941 & 0.1949 & 0.0985 & 0.1023 & 0.1004 \\
+trim\_rep1.2\_ngram2 & 0.2527 & 0.0296 & 0.0982 & 0.1904 & 0.0662 & 0.1000 & 0.0831 \\
+trim\_rep1.2\_ngram2\_t0.3 & 0.2500 & 0.0331 & 0.0978 & 0.1897 & 0.0611 & 0.0973 & 0.0792 \\
+trim\_rep1.3\_ngram2 & 0.2629 & 0.0331 & 0.1018 & 0.1926 & 0.0711 & 0.1019 & 0.0865 \\
+trim\_rep1.2\_ngram3 & 0.2725 & 0.0371 & 0.1017 & 0.2063 & 0.0738 & 0.0903 & 0.0821 \\
+trim\_rep1.5 & 0.2579 & 0.0264 & 0.1010 & 0.1817 & 0.0653 & 0.0916 & 0.0785 \\
+trim\_rep1.5\_ngram2 & 0.2560 & 0.0261 & 0.1008 & 0.1803 & 0.0647 & 0.0918 & 0.0782 \\
+trim\_rep1.3\_beam5 & 0.2262 & 0.0563 & 0.1041 & 0.2116 & \textbf{0.1512} & \textbf{0.1099} & \textbf{0.1306} \\
+trim\_ngram2 & 0.2406 & 0.0357 & 0.0969 & 0.1966 & 0.0569 & 0.0902 & 0.0736 \\
+trim\_rep1.2\_ngram2\_t48 & 0.1981 & 0.0226 & 0.0867 & 0.1831 & 0.0474 & 0.0942 & 0.0708 \\
+trim\_rep1.2\_beam5\_lp0.6 & 0.2236 & 0.0553 & 0.1034 & 0.2122 & 0.1396 & 0.1087 & 0.1241 \\
+trim\_incomplete & 0.2670 & 0.0476 & 0.1091 & 0.2180 & 0.0662 & 0.0854 & 0.0758 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}

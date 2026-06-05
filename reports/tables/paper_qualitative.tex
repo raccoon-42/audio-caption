@@ -1,0 +1,43 @@
+\begin{table*}[t]
+\centering
+\footnotesize
+\caption{Representative successes and failures (baseline greedy; captions trimmed at the last full sentence for display). The models recover genre, instrumentation and mood, but default to a male vocalist even on instrumental or non-music audio.}
+\label{tab:qual}
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\multicolumn{2}{c}{\textbf{Successes}}\\
+\midrule
+\addlinespace[2pt]
+\emph{Reference} & instrumental rock music with a drum kit, lots of cymbal crashes, acoustic guitar strumming, harmonized lead guitars and an active bass guitar. \\
+\emph{GPT-2} & This is a rock music piece. There is a male vocalist singing melodically. The electric guitar is playing the main tune while the bass guitar is playing in the background. The rhythmic background consists of a simple acoustic drum beat. The atmosphere is groovy. \\
+\emph{T5} & This is a rock music piece. There is a male vocalist singing melodically. The electric guitar is playing a simple tune with a bass guitar playing in the background. The rhythmic background consists of a fast-paced acoustic drum beat. \\
+\midrule
+\addlinespace[2pt]
+\emph{Reference} & This is a drum \& bass electronic music piece. There is no singer. There is a strong and fuzzy feeling bass sound. The rhythmic background consists of a loud and high tempo electronic drum beat. The atmosphere is modern and energetic. This piece could be playing at a nightclub or a dance club. \\
+\emph{GPT-2} & This is a techno music piece. There is a male vocalist singing melodically. The melody is being played by the synth bass. The rhythmic background consists of a fast-paced electronic drum beat. The atmosphere is groovy. This piece could be used in the background of nightclubs. \\
+\emph{T5} & This is a techno house music piece. There is a male vocalist singing melodically. The melody is being played by the synth bass while the rhythmic background consists of a fast-paced electronic drum beat. The atmosphere is energetic. \\
+\midrule
+\addlinespace[2pt]
+\emph{Reference} & A female singer sings this emotional melody. The song is medium tempo with guitar strumming rhythm, strong bass line, steady drumming rhythm, keyboard accompaniment and sound effects. The song is emotional and romantic. The song is a euro pop love song and has poor audio quality. \\
+\emph{GPT-2} & A female vocalist sings this soft melody. The tempo is medium with a keyboard accompaniment, steady drumming, steady bass line and keyboard accompaniment. The song is mellow, soft, mellifluous, emotional, sentimental, melancholic and romantic. \\
+\emph{T5} & This is a mellow, soft rock piece. There is a male vocalist singing melodically. The melody is being played by the electric guitar while the bass guitar is playing in the background. The rhythm is provided by a simple acoustic drum beat. \\
+\midrule
+\addlinespace[2pt]
+\emph{Reference} & The low quality recording features a live performance of a jazz song and it consists of a groovy bass guitar, groovy rhodes keys, electric guitar melody, shimmering hi hats, punchy kick and punchy snare hits. It sounds groovy, funky and passionate. The recording is noisy and in mono. \\
+\emph{GPT-2} & This is a jazz music piece. There is a saxophone solo being played. The melody is being played by the piano and the electric guitar. The rhythmic background consists of a simple acoustic drum beat. The atmosphere is groovy. This piece could be used in the background of a jazz bar. \\
+\emph{T5} & This is a live recording of a jazz music piece. There is a saxophone playing the lead melody while a bass guitar is playing in the background. The rhythm is being played by the acoustic drums. The atmosphere is jazzy. \\
+\midrule
+\multicolumn{2}{c}{\textbf{Failure cases}}\\
+\midrule
+\addlinespace[2pt]
+\emph{Reference} & The low quality recording features a printer that produces printing sounds and some muffled music playing in the background, probably on a radio. It is noisy and in mono. \\
+\emph{GPT-2} & This is a recording of a live performance of a pop music piece. There is a male vocalist singing melodically. The melody is being played by a keyboard and a bass guitar while the rhythmic background is provided by a fast tempo electronic drum beat. \\
+\emph{T5} & This is a live recording of a DJ performance. The DJ is scratching the turntable repeatedly. The turntable is a low quality recording. The sound of the turntable is distorted and the recording is of very poor quality. \\
+\midrule
+\addlinespace[2pt]
+\emph{Reference} & The low quality recording features a metallic hit, followed by resonating bowl tone. The recording is mono and noisy. \\
+\emph{GPT-2} & This is a meditation music piece. There is a bowl-like sound being played by the bowl. The bowl is being rubbed repeatedly. There is a calming and relaxing atmosphere to this piece. This piece can be used in the background of meditation videos. It can also be used in the background of meditation videos. \\
+\emph{T5} & This is a Tibetan singing bowl playing in the background of a meditation video. There is a chanting bowl being played. There is a chanting bowl being played. There is a chanting bowl being played. There is a chanting bowl being played. \\
+\bottomrule
+\end{tabularx}
+\end{table*}

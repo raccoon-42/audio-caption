@@ -1,0 +1,18 @@
+\begin{table}[ht]
+\centering
+\caption{GPT2 run-to-run variance over seeds [42, 43, 44] (std = noise floor).}
+\label{tab:noise_gpt2}
+\footnotesize
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%
+\begin{tabular}{lrrrrrrrrrr}
+\toprule
+Seed & BLEU-1 & BLEU-4 & METEOR & ROUGE-L & CIDEr-D & SPICE & SPIDEr & SBERT-sim & FER & FENSE \\
+\midrule
+42 & 0.3091 & 0.0631 & 0.1265 & 0.2329 & 0.1109 & 0.1091 & 0.1100 & 0.5820 & 0.3478 & 0.3998 \\
+43 & 0.3126 & 0.0702 & 0.1338 & 0.2361 & 0.1254 & 0.1027 & 0.1141 & 0.5982 & 0.3573 & 0.4095 \\
+44 & 0.3097 & 0.0692 & 0.1332 & 0.2356 & 0.1220 & 0.1064 & 0.1142 & 0.5966 & 0.3989 & 0.3824 \\
+\textbf{std} & \textbf{0.0019} & \textbf{0.0039} & \textbf{0.0041} & \textbf{0.0017} & \textbf{0.0076} & \textbf{0.0032} & \textbf{0.0024} & \textbf{0.0089} & \textbf{0.0272} & \textbf{0.0137} \\
+\bottomrule
+\end{tabular}
+}
+\end{table}

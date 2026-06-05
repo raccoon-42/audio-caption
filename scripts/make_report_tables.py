@@ -111,7 +111,10 @@ def write_table(path, header, rows, caption, label, col_format,
     lines.append(rf"\caption{{{caption}}}")
     lines.append(rf"\label{{{label}}}")
     lines.append(r"\footnotesize")
-    open_resize = r"\resizebox{\textwidth}{!}{%" if resize else ""
+    # Shrink-to-fit only: keep natural \footnotesize size for tables that fit,
+    # scale down ONLY the ones wider than the text block. Never upscale (which
+    # blew small tables up to inconsistent giant fonts).
+    open_resize = r"\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%" if resize else ""
     if open_resize:
         lines.append(open_resize)
     lines.append(rf"\begin{{tabular}}{{{col_format}}}")

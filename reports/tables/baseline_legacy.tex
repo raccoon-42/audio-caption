@@ -1,0 +1,16 @@
+\begin{table}[ht]
+\centering
+\caption{Baseline (greedy) test-set metrics --- Legacy metrics.}
+\label{tab:baseline_legacy}
+\footnotesize
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%
+\begin{tabular}{lrrrrrrr}
+\toprule
+Model & BLEU-1 & BLEU-4 & METEOR & ROUGE-L & CIDEr-D & SPICE & SPIDEr \\
+\midrule
+gpt2 & \textbf{0.3091} & \textbf{0.0631} & \textbf{0.1265} & \textbf{0.2329} & \textbf{0.1109} & \textbf{0.1091} & \textbf{0.1100} \\
+t5 & 0.3003 & 0.0574 & 0.1162 & 0.2275 & 0.0847 & 0.0866 & 0.0857 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}

@@ -1,0 +1,18 @@
+\begin{table}[ht]
+\centering
+\caption{T5 run-to-run variance over seeds [42, 43, 44] (std = noise floor).}
+\label{tab:noise_t5}
+\footnotesize
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{%
+\begin{tabular}{lrrrrrrrrrr}
+\toprule
+Seed & BLEU-1 & BLEU-4 & METEOR & ROUGE-L & CIDEr-D & SPICE & SPIDEr & SBERT-sim & FER & FENSE \\
+\midrule
+42 & 0.3003 & 0.0574 & 0.1162 & 0.2275 & 0.0847 & 0.0866 & 0.0857 & 0.5564 & 0.3251 & 0.3954 \\
+43 & 0.3164 & 0.0663 & 0.1234 & 0.2314 & 0.0961 & 0.1032 & 0.0996 & 0.5736 & 0.3724 & 0.3790 \\
+44 & 0.2926 & 0.0651 & 0.1201 & 0.2328 & 0.1201 & 0.1108 & 0.1155 & 0.5905 & 0.2703 & 0.4452 \\
+\textbf{std} & \textbf{0.0122} & \textbf{0.0048} & \textbf{0.0036} & \textbf{0.0027} & \textbf{0.0181} & \textbf{0.0124} & \textbf{0.0149} & \textbf{0.0170} & \textbf{0.0511} & \textbf{0.0345} \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
