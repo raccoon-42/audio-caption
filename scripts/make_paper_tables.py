@@ -16,7 +16,7 @@ MODELS = ["gpt2", "t5"]
 NAMES = {"gpt2": "GPT-2", "t5": "T5"}
 ALL_METRICS = ["BLEU-1", "BLEU-4", "METEOR", "ROUGE-L", "CIDEr-D",
                "SPICE", "SPIDEr", "SBERT-sim", "FER", "FENSE"]
-DEC_METRICS = ["FENSE", "SBERT-sim", "FER", "CIDEr-D", "SPIDEr"]
+DEC_METRICS = ALL_METRICS
 RESULTS = Path("results")
 OUT = Path("reports/tables")
 
@@ -111,7 +111,7 @@ def decoding_table(top_n=6):
         rows, "l" + "r" * len(DEC_METRICS), header,
         r"Top decoding configurations per model (eval-only on the baseline "
         r"checkpoint), ranked by \textsc{Fense}. Note that high \textsc{Fense} "
-        r"coincides with near-zero FER while lexical metrics (CIDEr-D, SPIDEr) "
+        r"coincides with near-zero FER while the lexical metrics "
         r"barely move -- see Figure~\ref{fig:fensefer}.",
         "tab:decoding")
     print("wrote paper_decoding.tex")

@@ -1,30 +1,30 @@
 \begin{table*}[t]
 \centering
-\caption{Top decoding configurations per model (eval-only on the baseline checkpoint), ranked by \textsc{Fense}. Note that high \textsc{Fense} coincides with near-zero FER while lexical metrics (CIDEr-D, SPIDEr) barely move -- see Figure~\ref{fig:fensefer}.}
+\caption{Top decoding configurations per model (eval-only on the baseline checkpoint), ranked by \textsc{Fense}. Note that high \textsc{Fense} coincides with near-zero FER while the lexical metrics barely move -- see Figure~\ref{fig:fensefer}.}
 \label{tab:decoding}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
-\begin{tabular}{lrrrrr}
+\begin{tabular}{lrrrrrrrrrr}
 \toprule
-Config & FENSE & SBERT-sim & FER & CIDEr-D & SPIDEr \\
+Config & BLEU-1 & BLEU-4 & METEOR & ROUGE-L & CIDEr-D & SPICE & SPIDEr & SBERT-sim & FER & FENSE \\
 \midrule
-\multicolumn{6}{l}{\textbf{GPT-2}} \\
-greedy (baseline) & 0.3998 & 0.5820 & 0.3478 & 0.1109 & 0.1100 \\
-trim\_ngram2 & \textbf{0.5796} & 0.5807 & 0.0019 & 0.1092 & 0.1087 \\
-trim\_rep1.2\_ngram2\_t0.3 & 0.5775 & 0.5812 & 0.0076 & 0.1003 & 0.1033 \\
-trim\_rep1.2\_ngram2 & 0.5766 & 0.5766 & 0.0000 & 0.0959 & 0.1000 \\
-trim\_rep1.2\_ngram3 & 0.5766 & 0.5781 & 0.0019 & 0.0926 & 0.0986 \\
-trim\_rep1.2 & 0.5758 & 0.5774 & 0.0019 & 0.0924 & 0.0983 \\
-trim\_rep1.3 & 0.5723 & 0.5748 & 0.0057 & 0.0885 & 0.0938 \\
+\multicolumn{11}{l}{\textbf{GPT-2}} \\
+greedy (baseline) & 0.3091 & 0.0631 & 0.1265 & 0.2329 & 0.1109 & 0.1091 & 0.1100 & 0.5820 & 0.3478 & 0.3998 \\
+trim\_ngram2 & 0.3171 & 0.0575 & 0.1210 & 0.2205 & 0.1092 & 0.1081 & 0.1087 & 0.5807 & 0.0019 & \textbf{0.5796} \\
+trim\_rep1.2\_ngram2\_t0.3 & 0.2829 & 0.0454 & 0.1137 & 0.1970 & 0.1003 & 0.1062 & 0.1033 & 0.5812 & 0.0076 & 0.5775 \\
+trim\_rep1.2\_ngram2 & 0.2810 & 0.0409 & 0.1124 & 0.1931 & 0.0959 & 0.1042 & 0.1000 & 0.5766 & 0.0000 & 0.5766 \\
+trim\_rep1.2\_ngram3 & 0.2839 & 0.0407 & 0.1127 & 0.1944 & 0.0926 & 0.1045 & 0.0986 & 0.5781 & 0.0019 & 0.5766 \\
+trim\_rep1.2 & 0.2834 & 0.0408 & 0.1124 & 0.1945 & 0.0924 & 0.1043 & 0.0983 & 0.5774 & 0.0019 & 0.5758 \\
+trim\_rep1.3 & 0.2605 & 0.0374 & 0.1058 & 0.1843 & 0.0885 & 0.0990 & 0.0938 & 0.5748 & 0.0057 & 0.5723 \\
 \midrule
-\multicolumn{6}{l}{\textbf{T5}} \\
-greedy (baseline) & 0.3954 & 0.5564 & 0.3251 & 0.0847 & 0.0857 \\
-trim\_rep1.2 & \textbf{0.5762} & 0.5762 & 0.0000 & 0.0863 & 0.0892 \\
-trim\_beam5\_ngram2 & 0.5649 & 0.5698 & 0.0095 & 0.0878 & 0.0945 \\
-trim\_rep1.3 & 0.5640 & 0.5640 & 0.0000 & 0.0779 & 0.0883 \\
-trim\_rep1.2\_beam5\_ngram2 & 0.5618 & 0.5716 & 0.0189 & 0.0985 & 0.1004 \\
-trim\_rep1.2\_ngram2 & 0.5593 & 0.5593 & 0.0000 & 0.0662 & 0.0831 \\
-trim\_rep1.2\_ngram2\_t0.3 & 0.5591 & 0.5599 & 0.0019 & 0.0611 & 0.0792 \\
+\multicolumn{11}{l}{\textbf{T5}} \\
+greedy (baseline) & 0.3003 & 0.0574 & 0.1162 & 0.2275 & 0.0847 & 0.0866 & 0.0857 & 0.5564 & 0.3251 & 0.3954 \\
+trim\_rep1.2 & 0.3045 & 0.0498 & 0.1158 & 0.2203 & 0.0863 & 0.0921 & 0.0892 & 0.5762 & 0.0000 & \textbf{0.5762} \\
+trim\_beam5\_ngram2 & 0.1923 & 0.0428 & 0.0918 & 0.1967 & 0.0878 & 0.1013 & 0.0945 & 0.5698 & 0.0095 & 0.5649 \\
+trim\_rep1.3 & 0.2934 & 0.0424 & 0.1124 & 0.2065 & 0.0779 & 0.0987 & 0.0883 & 0.5640 & 0.0000 & 0.5640 \\
+trim\_rep1.2\_beam5\_ngram2 & 0.1956 & 0.0442 & 0.0941 & 0.1949 & 0.0985 & 0.1023 & 0.1004 & 0.5716 & 0.0189 & 0.5618 \\
+trim\_rep1.2\_ngram2 & 0.2527 & 0.0296 & 0.0982 & 0.1904 & 0.0662 & 0.1000 & 0.0831 & 0.5593 & 0.0000 & 0.5593 \\
+trim\_rep1.2\_ngram2\_t0.3 & 0.2500 & 0.0331 & 0.0978 & 0.1897 & 0.0611 & 0.0973 & 0.0792 & 0.5599 & 0.0019 & 0.5591 \\
 \bottomrule
 \end{tabular}
 \end{table*}
