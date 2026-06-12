@@ -35,15 +35,6 @@ CONFIGS = {
 TRAIN_FNS = {"gpt2": gpt2_train, "t5": t5_train, "opt": opt_train, "llama": llama_train}
 EVAL_FNS = {"gpt2": gpt2_eval, "t5": t5_eval, "opt": opt_eval, "llama": llama_eval}
 
-SEARCH_RANGES = {
-    "gpt2":  {"s1_lr": (1e-4, 5e-2), "s2_proj_lr": (1e-5, 1e-3), "s2_lm_lr": (5e-6, 1e-2)},
-    "t5":    {"s1_lr": (1e-2, 1e-1), "s2_proj_lr": (1e-5, 1e-3), "s2_lm_lr": (5e-6, 1e-2)},
-    "opt":   {"s1_lr": (1e-5, 5e-3), "s2_proj_lr": (1e-5, 1e-3), "s2_lm_lr": (5e-6, 1e-2)},
-    # s2_lm_lr capped at 7e-6: lm_lr >=~1e-5 causes 1-epoch overfit collapse on the 1B
-    # model (depth2 baseline drew 1.1e-5 -> val 1.91, collapse); the healthy depth1/depth3
-    # optima sit at 1.2e-6/5.6e-6 (val 1.82/1.85). Cap excludes the empirically-bad hot zone.
-    "llama": {"s1_lr": (1e-5, 2e-1), "s2_proj_lr": (1e-5, 5e-2), "s2_lm_lr": (1e-7, 7e-6)},
-}
 
 
 def load_model(model_key, cfg, device):
@@ -169,7 +160,7 @@ def main():
         print("Stage 1 LR search")
         print(f"{'='*50}")
 
-        s1_range = SEARCH_RANGES[args.model]["s1_lr"]
+        s1_range = cfg["lr_search"]["s1_lr"]
 
         def s1_objective(trial):
             lo, hi = s1_range
@@ -266,8 +257,8 @@ def main():
 
         best_s1_projection_state = torch.load(s1_proj_path, weights_only=True, map_location=device)
 
-        s2_proj_range = SEARCH_RANGES[args.model]["s2_proj_lr"]
-        s2_lm_range = SEARCH_RANGES[args.model]["s2_lm_lr"]
+        s2_proj_range = cfg["lr_search"]["s2_proj_lr"]
+        s2_lm_range = cfg["lr_search"]["s2_lm_lr"]
 
         def s2_objective(trial):
             lo, hi = s2_proj_range

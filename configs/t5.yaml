@@ -16,3 +16,7 @@ stage2:
   epochs: 30
   projection_lr: 9.522559201484311e-05
   lm_lr: 0.0005095918332423143
+lr_search:
+  s1_lr: [1.0e-2, 1.0e-1]
+  s2_proj_lr: [1.0e-5, 1.0e-3]
+  s2_lm_lr: [5.0e-6, 1.0e-2]
