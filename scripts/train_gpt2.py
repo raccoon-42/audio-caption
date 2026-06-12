@@ -87,6 +87,8 @@ def main():
     parser.add_argument("--prefix-len", type=int, default=None)
     parser.add_argument("--dropout", type=float, default=None)
     parser.add_argument("--proj-depth", type=int, default=2)
+    parser.add_argument("--stage", choices=["1", "2", "both"], default="both",
+                        help="Which stage(s) to run. '2' resumes from the saved stage1_best.pt.")
     parser.add_argument("--patience", type=int, default=5)
     parser.add_argument("--ablation-tag", type=str, default=None)
     parser.add_argument("--use-layernorm", action="store_true")
@@ -137,42 +139,52 @@ def main():
     results_dir.mkdir(parents=True, exist_ok=True)
 
     # ========== STAGE 1: projection only ==========
-    print(f"=== Stage 1: training projection ({tag} / GPT-2 frozen) ===")
-    s1 = cfg["stage1"]
-    optimizer = torch.optim.AdamW(
-        projection.parameters(), lr=s1["lr"], weight_decay=cfg["weight_decay"]
-    )
+    if args.stage in ("1", "both"):
+        print(f"=== Stage 1: training projection ({tag} / GPT-2 frozen) ===")
+        s1 = cfg["stage1"]
+        optimizer = torch.optim.AdamW(
+            projection.parameters(), lr=s1["lr"], weight_decay=cfg["weight_decay"]
+        )
 
-    best_val, history_s1 = train_loop(
-        train_fn=lambda: train_one_epoch(projection, gpt2, train_loader, optimizer, prefix_len, device),
-        eval_fn=lambda: evaluate(projection, gpt2, val_loader, prefix_len, device),
-        optimizer=optimizer,
-        max_epochs=s1["epochs"],
-        patience=args.patience,
-        stage_label="S1",
-        ckpt_paths={"proj": (projection.state_dict, ckpt_dir / "stage1_best.pt")},
-        device=device,
-        t_max=s1["epochs"],
-    )
-    torch.save(projection.state_dict(), ckpt_dir / "stage1_last.pt")
+        best_val, history_s1 = train_loop(
+            train_fn=lambda: train_one_epoch(projection, gpt2, train_loader, optimizer, prefix_len, device),
+            eval_fn=lambda: evaluate(projection, gpt2, val_loader, prefix_len, device),
+            optimizer=optimizer,
+            max_epochs=s1["epochs"],
+            patience=args.patience,
+            stage_label="S1",
+            ckpt_paths={"proj": (projection.state_dict, ckpt_dir / "stage1_best.pt")},
+            device=device,
+            t_max=s1["epochs"],
+        )
+        torch.save(projection.state_dict(), ckpt_dir / "stage1_last.pt")
 
-    save_results(
-        results_dir / f"{tag}_stage1.json",
-        model_name="gpt2", stage=1, seed=train_seed,
-        best_val=best_val, history=history_s1,
-        hyperparams={
-            "prefix_len": prefix_len, "lr": s1["lr"],
-            "max_epochs": s1["epochs"], "patience": args.patience,
-            "batch_size": cfg["batch_size"],
-            "weight_decay": cfg["weight_decay"], "dropout": dropout,
-            "proj_depth": args.proj_depth, "use_layernorm": use_layernorm,
-            "split_seed": split_seed,
-        },
-    )
+        save_results(
+            results_dir / f"{tag}_stage1.json",
+            model_name="gpt2", stage=1, seed=train_seed,
+            best_val=best_val, history=history_s1,
+            hyperparams={
+                "prefix_len": prefix_len, "lr": s1["lr"],
+                "max_epochs": s1["epochs"], "patience": args.patience,
+                "batch_size": cfg["batch_size"],
+                "weight_decay": cfg["weight_decay"], "dropout": dropout,
+                "proj_depth": args.proj_depth, "use_layernorm": use_layernorm,
+                "split_seed": split_seed,
+            },
+        )
+
+    if args.stage == "1":
+        print("Done (stage 1 only). Results saved to", results_dir)
+        return
 
     # ========== STAGE 2: projection + GPT-2 fine-tune ==========
     print(f"=== Stage 2: fine-tuning projection + {tag} / GPT-2 ===")
-    projection.load_state_dict(torch.load(ckpt_dir / "stage1_best.pt", weights_only=True))
+    s1_ckpt = ckpt_dir / "stage1_best.pt"
+    if not s1_ckpt.exists():
+        raise FileNotFoundError(
+            f"Stage 2 needs {s1_ckpt} -- run --stage 1 (or both) first."
+        )
+    projection.load_state_dict(torch.load(s1_ckpt, weights_only=True))
 
     for p in gpt2.parameters():
         p.requires_grad = True

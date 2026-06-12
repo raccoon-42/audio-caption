@@ -11,11 +11,11 @@ checkpoint_dir: checkpoints/encoder_swap/muq_mulan
 results_dir: results/encoder_swap/muq_mulan
 stage1:
   epochs: 30
-  lr: 0.03482758054893687
+  lr: 0.03535006785979591
 stage2:
   epochs: 30
-  projection_lr: 0.00040277292428281177
-  lm_lr: 0.00019501272867455334
+  projection_lr: 5.2720837185810934e-05
+  lm_lr: 0.00018450717720016737
 lr_search:
   s1_lr:
   - 0.001
