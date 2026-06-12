@@ -78,7 +78,7 @@ uv run python scripts/evaluate.py --stage 2 --model gpt2 --ckpt-tag gpt2_seed44
 | Step | Script | Description |
 |------|--------|-------------|
 | Data prep | `scripts/prepare_data.py` | Downloads MusicCaps, extracts audio, saves HF dataset |
-| CLAP embeddings | `scripts/prepare_data.py --precompute-clap` | Caches CLAP audio embeddings to `data/clap_embeddings.pt` |
+| CLAP embeddings | `scripts/prepare_data.py --precompute-clap` | Caches CLAP audio embeddings to `data/embeddings/clap_embeddings.pt` |
 | LR search | `scripts/lr_search.py --model <name>` | Optuna-based hyperparameter search per model; `--proj-depth N` for non-baseline depths |
 | Training | `scripts/train_<model>.py` | Per-model training (stage 1 + stage 2); `--seed N` for noise-floor runs |
 | Evaluation | `scripts/evaluate.py` | Generates captions and computes metrics |

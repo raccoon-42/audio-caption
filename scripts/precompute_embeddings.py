@@ -62,7 +62,8 @@ def build_clap(repo_id, device):
     @torch.no_grad()
     def extract(audio, target_sr):
         inputs = processor(audio=audio, sampling_rate=target_sr, return_tensors="pt")
-        feats = model.get_audio_features(**{k: v.to(device) for k, v in inputs.items()})
+        out = model.get_audio_features(**{k: v.to(device) for k, v in inputs.items()})
+        feats = out.pooler_output  # transformers 5.x returns BaseModelOutputWithPooling
         return feats.squeeze(0).cpu()
 
     return extract

@@ -225,7 +225,7 @@ def main():
         model_name = cfg.get("model_name", DEFAULT_MODEL_NAMES.get(args.model, args.model))
 
         data_dir = Path(cfg["data_dir"])
-        emb_path = cfg.get("embeddings") or data_dir.parent / "clap_embeddings.pt"
+        emb_path = cfg.get("embeddings") or data_dir.parent / "embeddings" / "clap_embeddings.pt"
         print(f"Loading precomputed embeddings from {emb_path}...")
         all_clap = torch.load(emb_path, weights_only=True)
         audio_dim = all_clap.shape[1]

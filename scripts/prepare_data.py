@@ -214,7 +214,8 @@ def main():
 def precompute_clap(data_dir):
     data_dir = Path(data_dir)
     dataset_dir = data_dir / "dataset"
-    out_path = data_dir / "clap_embeddings.pt"
+    out_path = data_dir / "embeddings" / "clap_embeddings.pt"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     ds = load_from_disk(str(dataset_dir))
     print(f"Precomputing CLAP embeddings for {len(ds)} samples...")

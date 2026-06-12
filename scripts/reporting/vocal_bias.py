@@ -96,7 +96,7 @@ def clap_probe():
     from datasets import load_from_disk
     from transformers import ClapModel, ClapProcessor
 
-    emb = torch.load("data/clap_embeddings.pt", map_location="cpu", weights_only=False)
+    emb = torch.load("data/embeddings/clap_embeddings.pt", map_location="cpu", weights_only=False)
     caps = load_from_disk("data/dataset")["caption"]
     model = ClapModel.from_pretrained("laion/clap-htsat-unfused").eval()
     proc = ClapProcessor.from_pretrained("laion/clap-htsat-unfused")
