@@ -117,6 +117,9 @@ def run_stage(train_fn, eval_fn, projection, lm, train_loader, val_loader,
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True, choices=["gpt2", "t5", "opt", "llama"])
+    parser.add_argument("--config", type=str, default=None,
+                        help="Config path override (default configs/<model>.yaml). "
+                             "Best LRs are written back to this file.")
     parser.add_argument("--stage", choices=["s1", "s2", "both"], default="both")
     parser.add_argument("--n-trials", type=int, default=16)
     parser.add_argument("--epochs-per-stage", type=int, default=8)
@@ -128,7 +131,7 @@ def main():
     proj_depth = args.proj_depth
     tag = args.model if proj_depth == 2 else f"{args.model}_depth{proj_depth}"
 
-    config_path = CONFIGS[args.model]
+    config_path = args.config or CONFIGS[args.model]
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
 

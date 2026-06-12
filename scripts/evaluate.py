@@ -224,9 +224,10 @@ def main():
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model_name = cfg.get("model_name", DEFAULT_MODEL_NAMES.get(args.model, args.model))
 
-        print("Loading precomputed CLAP embeddings...")
         data_dir = Path(cfg["data_dir"])
-        all_clap = torch.load(data_dir.parent / "clap_embeddings.pt", weights_only=True)
+        emb_path = cfg.get("embeddings") or data_dir.parent / "clap_embeddings.pt"
+        print(f"Loading precomputed embeddings from {emb_path}...")
+        all_clap = torch.load(emb_path, weights_only=True)
         audio_dim = all_clap.shape[1]
 
         print(f"Loading {model_name}...")

@@ -1,0 +1,18 @@
+seed: 42
+prefix_len: 8
+batch_size: 8
+dropout: 0.3
+use_layernorm: true
+weight_decay: 0.1
+test_size: 0.1
+data_dir: data/dataset
+embeddings: data/embeddings/mert_330m_embeddings.pt
+checkpoint_dir: checkpoints/encoder_swap/mert_330m
+results_dir: results/encoder_swap/mert_330m
+stage1:
+  epochs: 30
+  lr: 0.012424585046382004
+stage2:
+  epochs: 30
+  projection_lr: 9.313824998136215e-05
+  lm_lr: 0.00012003173007330727

@@ -33,7 +33,8 @@ class MusicCapsDataset(Dataset):
 
 def load_dataloaders(cfg, tokenizer, batch_size=None, seed=None, do_3way=True):
     data_dir = Path(cfg["data_dir"])
-    all_clap = torch.load(data_dir.parent / "clap_embeddings.pt", weights_only=True)
+    emb_path = cfg.get("embeddings") or data_dir.parent / "clap_embeddings.pt"
+    all_clap = torch.load(emb_path, weights_only=True)
     audio_dim = all_clap.shape[1]
 
     ds = load_from_disk(str(data_dir))
