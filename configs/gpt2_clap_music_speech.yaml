@@ -11,12 +11,18 @@ checkpoint_dir: checkpoints/encoder_swap/clap_music_speech
 results_dir: results/encoder_swap/clap_music_speech
 stage1:
   epochs: 30
-  lr: 0.012424585046382004
+  lr: 0.01999639276113298
 stage2:
   epochs: 30
-  projection_lr: 9.313824998136215e-05
-  lm_lr: 0.00012003173007330727
+  projection_lr: 1.1228920453850983e-05
+  lm_lr: 0.0001773952064960961
 lr_search:
-  s1_lr: [1.0e-4, 5.0e-2]
-  s2_proj_lr: [1.0e-5, 1.0e-3]
-  s2_lm_lr: [5.0e-6, 1.0e-2]
+  s1_lr:
+  - 0.0001
+  - 0.05
+  s2_proj_lr:
+  - 1.0e-06
+  - 0.0001
+  s2_lm_lr:
+  - 5.0e-06
+  - 0.01
