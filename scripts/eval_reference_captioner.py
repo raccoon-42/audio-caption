@@ -6,8 +6,8 @@ run them (its --model is restricted to gpt2/t5/opt/llama). Instead we generate
 here and reuse evaluate.compute_metrics, scoring on the IDENTICAL test rows as
 the pipeline models -> drops into a separate reference-comparison table.
 
-Default model is nvidia/audio-flamingo-next-captioner-hf; --model-id generalizes
-to any HF chat-style audio-LM with the same processor/apply_chat_template API.
+Default model is nvidia/audio-flamingo-next-captioner-hf. --backend selects the
+generation API (each audio-LM family differs); auto-detected from --model-id.
 
 Run on the Ubuntu GPU box (8B, BF16). Predictions are cached, so re-running
 re-scores without regenerating; pass a fresh --tag to force a new generation.
@@ -23,7 +23,9 @@ import torchaudio
 import yaml
 from datasets import load_from_disk
 from tqdm import tqdm
-from transformers import AutoModel, AutoProcessor
+from transformers import (
+    AutoModel, AutoProcessor, Qwen2AudioForConditionalGeneration,
+)
 
 from evaluate import compute_metrics
 
@@ -53,34 +55,85 @@ def decode_to_16k_mono(audio_decoder):
     return wav.to(torch.float32)
 
 
-def generate_caption(model, processor, wav, prompt, gen_kwargs):
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as tmp:
-        torchaudio.save(tmp.name, wav, TARGET_SR)
-        conversation = [[{
+# --- Backends: each audio-LM family has its own load + generation API. ---
+class FlamingoBackend:
+    """nvidia/audio-flamingo-*: AutoModel, audio passed as a file path via the
+    chat template (tokenize=True), input_features cast to model dtype."""
+
+    def __init__(self, model_id):
+        self.processor = AutoProcessor.from_pretrained(model_id)
+        self.model = AutoModel.from_pretrained(
+            model_id, torch_dtype=torch.bfloat16, device_map="auto").eval()
+
+    def caption(self, wav, prompt, gen_kwargs):
+        model, processor = self.model, self.processor
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as tmp:
+            torchaudio.save(tmp.name, wav, TARGET_SR)
+            conversation = [[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "audio", "path": tmp.name},
+                ],
+            }]]
+            batch = processor.apply_chat_template(
+                conversation, tokenize=True, add_generation_prompt=True,
+                return_dict=True,
+            ).to(model.device)
+            if "input_features" in batch:
+                batch["input_features"] = batch["input_features"].to(model.dtype)
+            with torch.no_grad():
+                generated = model.generate(**batch, **gen_kwargs)
+        prompt_len = batch["input_ids"].shape[1]
+        return processor.batch_decode(
+            generated[:, prompt_len:], skip_special_tokens=True,
+            clean_up_tokenization_spaces=False,
+        )[0].strip()
+
+
+class QwenBackend:
+    """Qwen/Qwen2-Audio-*: Qwen2AudioForConditionalGeneration, audio passed as an
+    in-memory 16 kHz array via processor(audios=...), ChatML two-step build."""
+
+    def __init__(self, model_id):
+        self.processor = AutoProcessor.from_pretrained(model_id)
+        self.model = Qwen2AudioForConditionalGeneration.from_pretrained(
+            model_id, torch_dtype=torch.bfloat16, device_map="auto").eval()
+        sr = self.processor.feature_extractor.sampling_rate
+        assert sr == TARGET_SR, f"processor expects {sr} Hz, decode targets {TARGET_SR}"
+
+    def caption(self, wav, prompt, gen_kwargs):
+        model, processor = self.model, self.processor
+        audio = wav.squeeze(0).to(torch.float32).numpy()
+        conversation = [{
             "role": "user",
             "content": [
+                {"type": "audio", "audio_url": "clip"},  # marker; array below
                 {"type": "text", "text": prompt},
-                {"type": "audio", "path": tmp.name},
             ],
-        }]]
-        batch = processor.apply_chat_template(
-            conversation,
-            tokenize=True,
-            add_generation_prompt=True,
-            return_dict=True,
+        }]
+        text = processor.apply_chat_template(
+            conversation, add_generation_prompt=True, tokenize=False)
+        inputs = processor(
+            text=text, audios=[audio], sampling_rate=TARGET_SR,
+            return_tensors="pt", padding=True,
         ).to(model.device)
-        if "input_features" in batch:
-            batch["input_features"] = batch["input_features"].to(model.dtype)
-
         with torch.no_grad():
-            generated = model.generate(**batch, **gen_kwargs)
+            generated = model.generate(**inputs, **gen_kwargs)
+        prompt_len = inputs.input_ids.size(1)
+        return processor.batch_decode(
+            generated[:, prompt_len:], skip_special_tokens=True,
+            clean_up_tokenization_spaces=False,
+        )[0].strip()
 
-    prompt_len = batch["input_ids"].shape[1]
-    return processor.batch_decode(
-        generated[:, prompt_len:],
-        skip_special_tokens=True,
-        clean_up_tokenization_spaces=False,
-    )[0].strip()
+
+BACKENDS = {"flamingo": FlamingoBackend, "qwen": QwenBackend}
+
+
+def resolve_backend(name, model_id):
+    if name != "auto":
+        return name
+    return "qwen" if "qwen" in model_id.lower() else "flamingo"
 
 
 def main():
@@ -88,6 +141,8 @@ def main():
     parser.add_argument("--config", default="configs/gpt2.yaml",
                         help="Only used for the split seed (must match evaluate.py).")
     parser.add_argument("--model-id", default="nvidia/audio-flamingo-next-captioner-hf")
+    parser.add_argument("--backend", default="auto", choices=["auto", "flamingo", "qwen"],
+                        help="Generation API; auto-detected from --model-id.")
     parser.add_argument("--name", default="audio_flamingo",
                         help="Short name for output dir/filenames.")
     parser.add_argument("--tag", default=None,
@@ -141,12 +196,10 @@ def main():
             test_data = test_data.select(range(min(args.limit, len(test_data))))
         print(f"Test split: {len(test_data)} rows (seed {seed}).")
 
-        print(f"Loading {args.model_id} ...")
-        processor = AutoProcessor.from_pretrained(args.model_id)
-        model = AutoModel.from_pretrained(
-            args.model_id, torch_dtype=torch.bfloat16, device_map="auto",
-        ).eval()
-        print("Loaded. dtype:", model.dtype, "device:", model.device)
+        backend_name = resolve_backend(args.backend, args.model_id)
+        print(f"Loading {args.model_id} (backend: {backend_name}) ...")
+        backend = BACKENDS[backend_name](args.model_id)
+        print("Loaded. dtype:", backend.model.dtype, "device:", backend.model.device)
         print(f"Prompt: {prompt!r}")
         print(f"Gen kwargs: {gen_kwargs}")
 
@@ -160,7 +213,7 @@ def main():
         for i in tqdm(range(len(test_data)), desc="Generating"):
             try:
                 wav = decode_to_16k_mono(test_data[i]["audio"])
-                hyp = generate_caption(model, processor, wav, prompt, gen_kwargs)
+                hyp = backend.caption(wav, prompt, gen_kwargs)
                 references.append(meta[i]["caption"])
                 hypotheses.append(hyp)
             except Exception as e:
