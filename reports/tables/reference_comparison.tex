@@ -1,0 +1,23 @@
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\caption{Trained GPT-2 pipeline (stage-1 frozen LM, stage-2 fine-tuned) versus the
+zero-shot \textsc{Audio Flamingo} reference captioner on the shared MusicCaps test
+split. GPT-2 values are the seed-42 point estimate. $\uparrow$/$\downarrow$ mark
+metric direction; best per column in bold. Decoding differs (pipeline greedy
+\texttt{max\_new\_tokens}=64, Flamingo greedy 128) to reflect each model's natural
+output length. $^{\dagger}$\textsc{Audio Flamingo} may have seen MusicCaps in
+pre-training (treat as a reference upper bound, not a clean held-out score).
+Sample counts: GPT-2 (S1) $n{=}529$, GPT-2 (S2) $n{=}529$, Audio Flamingo $n{=}529$.}
+\label{tab:reference-comparison}
+\begin{tabular}{lcccccccccc}
+\toprule
+Model & BLEU-1 $\uparrow$ & BLEU-4 $\uparrow$ & METEOR $\uparrow$ & ROUGE-L $\uparrow$ & CIDEr-D $\uparrow$ & SPICE $\uparrow$ & SPIDEr $\uparrow$ & SBERT-sim $\uparrow$ & FER $\downarrow$ & FENSE $\uparrow$ \\
+\midrule
+GPT-2 (S1) & 0.264 & 0.043 & 0.108 & 0.213 & 0.051 & 0.105 & 0.078 & 0.524 & 0.611 & 0.240 \\
+GPT-2 (S2) & \textbf{0.309} & \textbf{0.063} & \textbf{0.126} & \textbf{0.233} & \textbf{0.111} & \textbf{0.109} & \textbf{0.110} & 0.582 & 0.348 & 0.400 \\
+Audio Flamingo$^{\dagger}$ & 0.206 & 0.010 & 0.111 & 0.169 & 0.028 & 0.070 & 0.049 & \textbf{0.586} & \textbf{0.278} & \textbf{0.440} \\
+\bottomrule
+\end{tabular}
+\end{table*}
