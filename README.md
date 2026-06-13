@@ -44,6 +44,25 @@ encoders are mean-pooled over time. The encoder comparison reports **stage-1
 (frozen-LM)** numbers, since stage-2 full fine-tuning tends to flatten upstream
 differences.
 
+## Reference Captioners
+
+Large zero-shot audio-LMs caption raw audio directly, bypassing the
+CLAP→projection→LM pipeline. They are scored on the **same test split and the same
+metrics** as a separate reference comparison (not as controlled ablation rows), to
+contextualize the lightweight pipeline against off-the-shelf models.
+
+| Model | HF repo | Backend | Input |
+|-------|---------|---------|-------|
+| Audio Flamingo | `nvidia/audio-flamingo-next-captioner-hf` | `flamingo` | 16 kHz wav path |
+| Qwen2-Audio | `Qwen/Qwen2-Audio-7B-Instruct` | `qwen` | 16 kHz array |
+
+Decoding is kept close to the pipeline (greedy, no repetition penalty, no sentence
+trimming) so the comparison is fair; only `max_new_tokens` is higher (128) to fit the
+captioner's natural output length. Caveats reported alongside the numbers: these
+models may have seen MusicCaps in pre-training (treat as a **reference upper bound**,
+not a clean held-out score), and **FENSE** is the fair comparator since verbose output
+penalizes lexical n-gram metrics on a style mismatch.
+
 ## Reproducing Results
 
 ### Prerequisites
@@ -124,6 +143,23 @@ uv run python scripts/precompute_embeddings.py --encoder musicfm --musicfm-repo 
 Stage-2 can be run later from the saved `stage1_best.pt`:
 `train_gpt2.py --stage 2 --config configs/gpt2_<encoder>.yaml`.
 
+### 3c. Reference captioners (zero-shot, separate comparison)
+
+```bash
+# Smoke test first (prints REF vs HYP for a few clips)
+uv run python scripts/try_audio_flamingo.py --n 5
+uv run python scripts/try_qwen_audio.py --n 5
+
+# Full generate + score on the shared test split (backend auto-detected)
+uv run python scripts/eval_reference_captioner.py \
+    --model-id nvidia/audio-flamingo-next-captioner-hf --name audio_flamingo
+uv run python scripts/eval_reference_captioner.py \
+    --model-id Qwen/Qwen2-Audio-7B-Instruct --name qwen2_audio
+
+# Comparison figure + table vs GPT-2 S1/S2
+uv run python scripts/reporting/reference_comparison.py
+```
+
 ## Pipeline Steps
 
 | Step | Script | Description |
@@ -138,6 +174,8 @@ Stage-2 can be run later from the saved `stage1_best.pt`:
 | Decoding ablations | `scripts/run_decoding_ablations.sh` | Eval-only, ~23 decoding configs per model |
 | Encoder LR search | `scripts/run_lr_search_encoders.sh` | LR search across all encoder configs |
 | Encoder train+eval | `scripts/run_train_eval_encoders.sh` | Stage-1 train + eval per encoder (baseline eval-only) |
+| Reference captioner | `scripts/eval_reference_captioner.py` | Generate + score a zero-shot audio-LM (`--model-id`, `--backend`); reuses `compute_metrics` |
+| Captioner smoke tests | `scripts/try_audio_flamingo.py`, `scripts/try_qwen_audio.py` | Print REF vs HYP for a few clips before a full run |
 | Report artifacts | `scripts/reporting/*.py` | LaTeX table fragments and figures generated from `results/` |
 
 ## Ablations
@@ -185,6 +223,9 @@ scripts/
   evaluate.py              Shared evaluation (metrics + generation)
   prepare_data.py          Data download and baseline CLAP precomputation
   precompute_embeddings.py Encoder-swap embedding extraction (--encoder <name>)
+  eval_reference_captioner.py Zero-shot audio-LM generate + score (multi-backend)
+  try_audio_flamingo.py    Audio Flamingo smoke test
+  try_qwen_audio.py        Qwen2-Audio smoke test
   dataset.py               Dataloader with embedding caching
   projection.py            Shared MLP projection module (input dim auto-derived)
   trainer.py               Shared training loop + early stopping
@@ -198,6 +239,7 @@ scripts/
     thesis_tables.py           LaTeX table fragments for the thesis report
     paper_tables.py            Lean table fragments for the two-column paper
     figures.py                 Result figures (vector PDF)
+    reference_comparison.py    Pipeline vs zero-shot captioner figure + table
     vocal_bias.py              Vocalist-bias statistics + tables
 data/                 Dataset and cached embeddings
   embeddings/         Precomputed per-encoder embedding tensors
@@ -209,6 +251,7 @@ results/              Structured results (per model / per encoder):
   predictions/          Cached generation outputs
   ablations/arch/       Arch ablation result JSONs
   ablations/decoding/   Decoding ablation result JSONs
+  reference/<name>/     Zero-shot captioner predictions + metrics JSONs
 ```
 
 ## Reproducibility
