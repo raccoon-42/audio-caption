@@ -64,6 +64,7 @@ REFERENCES = [
     ("Qwen2-Audio", "qwen2_audio", True),
     ("Qwen3-Omni Captioner", "qwen3_omni_captioner", True),
     ("LP-MusicCaps (pretrain)", "lp_music_caps", False),
+    ("LP-MusicCaps (transfer)", "lp_music_caps_transfer", True),
 ]
 
 
@@ -119,29 +120,42 @@ def main():
 
 
 def _figure(rows):
-    colors = ["#4C72B0", "#55A868", "#C44E52", "#8172B3", "#CCB974", "#64B5CD"]
+    colors = ["#4C72B0", "#55A868", "#C44E52", "#8172B3", "#CCB974", "#64B5CD", "#937860"]
     fig, axes = plt.subplots(1, len(METRIC_GROUPS), figsize=(11, 3.6),
                              gridspec_kw={"width_ratios": [len(g[1]) for g in METRIC_GROUPS]})
     for ax, (gname, metrics, ymin) in zip(axes, METRIC_GROUPS):
         x = range(len(metrics))
         n_rows = len(rows)
         w = 0.8 / n_rows
+        vals = [mv.get(m, 0.0) for _, mv, _, _, _, _ in rows for m in metrics]
+        # Cap the panel from the <=1 bars only: CIDEr-D/SPIDEr are unbounded and a
+        # leaked memorizing row (LP-MusicCaps transfer, CIDEr-D ~3.7) would crush
+        # every other bar. Bars above `top` are clipped and labeled with the value.
+        capped = [v for v in vals if v <= 1.0] or vals
+        top = max(0.7, max(capped) * 1.12)
+        if ymin is None:  # auto-zoom: floor just below the smallest bar
+            lo = min(vals)
+            ymin = max(0.0, (int(lo * 10) / 10) - 0.05)
+        overflowed = False
         for ri, (label, mvals, mstd, _, _, _) in enumerate(rows):
             offs = [xi + (ri - (n_rows - 1) / 2) * w for xi in x]
             heights = [mvals.get(m, 0.0) for m in metrics]
             errs = [mstd.get(m, 0.0) for m in metrics]
             ax.bar(offs, heights, width=w, color=colors[ri % len(colors)],
                    label=label, yerr=errs if any(errs) else None, capsize=2)
+            for off, h in zip(offs, heights):
+                if h > top:  # annotate true value at the clipped bar top
+                    overflowed = True
+                    ax.annotate(f"{h:.2f}", xy=(off, top), xytext=(0, -1),
+                                textcoords="offset points", ha="center", va="top",
+                                fontsize=5, rotation=90)
         # arrows mark metric direction; FER is lower-better.
         ticks = [f"{m}\n{'↓' if m in LOWER_BETTER else '↑'}" for m in metrics]
         ax.set_xticks(list(x))
         ax.set_xticklabels(ticks)
-        vals = [mv.get(m, 0.0) for _, mv, _, _, _, _ in rows for m in metrics]
-        top = max(0.7, max(vals) * 1.12)
-        if ymin is None:  # auto-zoom: floor just below the smallest bar
-            lo = min(vals)
-            ymin = max(0.0, (int(lo * 10) / 10) - 0.05)
         title = gname if ymin == 0 else f"{gname} (y-axis from {ymin:g})"
+        if overflowed:
+            title += f" (bars >{top:.2g} clipped, value shown)"
         ax.set_title(title)
         ax.set_ylim(ymin, top)
         ax.grid(axis="y", alpha=0.3)
@@ -160,10 +174,12 @@ def _figure(rows):
 
 
 def _best_per_metric(rows):
-    """metric -> label of the best row (direction-aware)."""
+    """metric -> label of the best NON-LEAKED row (direction-aware). Leaked rows
+    (daggered upper bounds; LP-MusicCaps transfer trained on ~half this test set)
+    are excluded so bolding never rewards leakage."""
     best = {}
     for m in ALL_METRICS:
-        vals = [(lbl, mv[m]) for lbl, mv, _, _, _, _ in rows if m in mv]
+        vals = [(lbl, mv[m]) for lbl, mv, _, _, _, leaks in rows if m in mv and not leaks]
         if not vals:
             continue
         pick = min if m in LOWER_BETTER else max
@@ -195,12 +211,16 @@ def _table(rows):
 \setlength{\tabcolsep}{4pt}
 \caption{Trained GPT-2 pipeline (stage-1 frozen LM, stage-2 fine-tuned) versus the
 zero-shot reference captioners on the shared MusicCaps test split. GPT-2 values are
-the seed-42 point estimate. $\uparrow$/$\downarrow$ mark metric direction; best per
-column in bold. Decoding differs (pipeline greedy \texttt{max\_new\_tokens}=64,
+the seed-42 point estimate. $\uparrow$/$\downarrow$ mark metric direction; best
+\emph{non-leaked} row per column in bold (daggered rows are upper bounds, not
+bolded). Decoding differs (pipeline greedy \texttt{max\_new\_tokens}=64,
 captioners greedy 128) to reflect each model's natural output length.
 $^{\dagger}$may have seen MusicCaps in pre-training (treat as reference upper
 bounds, not clean held-out scores); LP-MusicCaps (pretrain) trained only on MSD
-pseudo-captions, so it is leakage-free on this split. Sample counts: """ + ns + r""".}
+pseudo-captions, so it is leakage-free on this split, whereas LP-MusicCaps
+(transfer) was fine-tuned on MusicCaps official-train and overlaps ${\sim}48\%$ of
+this test split -- its inflated CIDEr-D/SPIDEr are a train-on-test signature, not a
+quality result. Sample counts: """ + ns + r""".}
 \label{tab:reference-comparison}
 \begin{tabular}{l""" + "c" * len(ALL_METRICS) + r"""}
 \toprule
