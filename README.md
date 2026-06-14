@@ -51,17 +51,27 @@ CLAP→projection→LM pipeline. They are scored on the **same test split and th
 metrics** as a separate reference comparison (not as controlled ablation rows), to
 contextualize the lightweight pipeline against off-the-shelf models.
 
-| Model | HF repo | Backend | Input |
-|-------|---------|---------|-------|
-| Audio Flamingo | `nvidia/audio-flamingo-next-captioner-hf` | `flamingo` | 16 kHz wav path |
-| Qwen2-Audio | `Qwen/Qwen2-Audio-7B-Instruct` | `qwen` | 16 kHz array |
+| Model | HF repo / slug | Backend | Input |
+|-------|----------------|---------|-------|
+| Audio Flamingo | `nvidia/audio-flamingo-next-captioner-hf` | `flamingo` | 16 kHz wav path (local) |
+| Qwen2-Audio | `Qwen/Qwen2-Audio-7B-Instruct` | `qwen` | 16 kHz array (local) |
+| Qwen3-Omni Captioner | `qwen3-omni-30b-a3b-captioner` | `dashscope` | base64 WAV via DashScope API |
 
-Decoding is kept close to the pipeline (greedy, no repetition penalty, no sentence
-trimming) so the comparison is fair; only `max_new_tokens` is higher (128) to fit the
-captioner's natural output length. Caveats reported alongside the numbers: these
-models may have seen MusicCaps in pre-training (treat as a **reference upper bound**,
-not a clean held-out score), and **FENSE** is the fair comparator since verbose output
-penalizes lexical n-gram metrics on a style mismatch.
+The first two run locally (BF16 on GPU). The 30B Qwen3-Omni captioner is too large to
+run locally, so the `dashscope` backend calls the DashScope OpenAI-compatible API
+(`openai` SDK + base URL); set `DASHSCOPE_API_KEY` in `.env` (auto-loaded), and
+`DASHSCOPE_BASE_URL` only for non-Singapore regions.
+
+Decoding is kept close to the pipeline (greedy, no repetition penalty) so the
+comparison is fair; `max_new_tokens` is higher (128) to fit the captioners' natural
+output length. The Qwen3-Omni captioner is **prompt-less and long-form** (it ignores
+text prompts), so it is generated then **sentence-aware trimmed to ~50 words**
+(`--trim-words`, the MusicCaps reference length) at scoring time — a normalization
+applied to that row only, since unlike the others it can't be prompted for brevity.
+Caveats reported alongside the numbers: these models may have seen MusicCaps in
+pre-training (treat as a **reference upper bound**, not a clean held-out score), and
+**FENSE** is the fair comparator since verbose output penalizes lexical n-gram metrics
+on a style mismatch.
 
 ## Reproducing Results
 
@@ -155,6 +165,12 @@ uv run python scripts/eval_reference_captioner.py \
     --model-id nvidia/audio-flamingo-next-captioner-hf --name audio_flamingo
 uv run python scripts/eval_reference_captioner.py \
     --model-id Qwen/Qwen2-Audio-7B-Instruct --name qwen2_audio
+
+# Qwen3-Omni captioner via DashScope API (needs DASHSCOPE_API_KEY in .env);
+# prompt-less long-form -> trim to ~50 words at scoring time
+uv run python scripts/eval_reference_captioner.py \
+    --model-id qwen3-omni-30b-a3b-captioner --name qwen3_omni_captioner \
+    --max-new-tokens 256 --trim-words 50
 
 # Comparison figure + table vs GPT-2 S1/S2
 uv run python scripts/reporting/reference_comparison.py
