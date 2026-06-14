@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Compare the trained GPT-2 pipeline against the zero-shot Audio Flamingo
-reference captioner on the shared MusicCaps test split (read-only on results/).
+"""Compare the trained GPT-2 pipeline against zero-shot reference captioners
+(Audio Flamingo, Qwen2-Audio) on the shared MusicCaps test split (read-only on
+results/). Any reference under results/reference/<name>/ present is included;
+missing ones are skipped with a note.
 
-Audio Flamingo bypasses the CLAP->projection->LM pipeline, so it sits in a
-separate reference row, not a controlled ablation. The fair pipeline comparator
+These captioners bypass the CLAP->projection->LM pipeline, so they sit in
+separate reference rows, not controlled ablations. The fair pipeline comparator
 is GPT-2 stage-1 (frozen LM, same as the encoder ablation); stage-2 is shown as
 the fully fine-tuned upper end. GPT-2 error bars are the across-seed std
-(42/43/44) for that stage; Flamingo is a single zero-shot pass (no band).
+(42/43/44) for that stage; the captioners are single zero-shot passes (no band).
 
 Outputs:
   reports/figures/fig_reference_comparison.pdf  -- grouped bars, one panel per
@@ -53,7 +55,17 @@ GPT2_S1_FILES = [ARCH / "gpt2_ablation_gpt2_s1.json",
 GPT2_S2_FILES = [ARCH / "gpt2_ablation_gpt2.json",
                  ARCH / "gpt2_ablation_gpt2_seed43.json",
                  ARCH / "gpt2_ablation_gpt2_seed44.json"]
-FLAMINGO_FILE = RESULTS / "reference" / "audio_flamingo" / "audio_flamingo_metrics_audio_flamingo.json"
+# Reference captioners: (display label, results/reference/<name>/ dir). The
+# metrics file is <name>_metrics_<name>.json (tag defaults to name).
+REFERENCES = [
+    ("Audio Flamingo", "audio_flamingo"),
+    ("Qwen2-Audio", "qwen2_audio"),
+    ("Qwen3-Omni Captioner", "qwen3_omni_captioner"),
+]
+
+
+def ref_file(name):
+    return RESULTS / "reference" / name / f"{name}_metrics_{name}.json"
 
 
 def load(p):
@@ -79,38 +91,39 @@ def main():
     FIG_OUT.mkdir(parents=True, exist_ok=True)
     TAB_OUT.mkdir(parents=True, exist_ok=True)
 
-    flam = load(FLAMINGO_FILE)
-    if not flam:
-        raise SystemExit(
-            f"Missing {FLAMINGO_FILE}\n"
-            "Run scripts/eval_reference_captioner.py first.")
-
     s1_metrics, s1_std = seed_stats(GPT2_S1_FILES)
     s2_metrics, s2_std = seed_stats(GPT2_S2_FILES)
     if s1_metrics is None:
         raise SystemExit("Missing GPT-2 S1 baseline eval JSONs.")
 
-    # rows: (label, metrics dict, per-metric std dict, n)
-    rows = [
-        ("GPT-2 (S1)", s1_metrics, s1_std, load(GPT2_S1_FILES[0])["num_samples"]),
-        ("GPT-2 (S2)", s2_metrics, s2_std, load(GPT2_S2_FILES[0])["num_samples"]) if s2_metrics else None,
-        ("Audio Flamingo", flam["metrics"], {}, flam["num_samples"]),
-    ]
-    rows = [r for r in rows if r]
+    # rows: (label, metrics dict, per-metric std dict, n, is_reference)
+    rows = [("GPT-2 (S1)", s1_metrics, s1_std, load(GPT2_S1_FILES[0])["num_samples"], False)]
+    if s2_metrics:
+        rows.append(("GPT-2 (S2)", s2_metrics, s2_std, load(GPT2_S2_FILES[0])["num_samples"], False))
+
+    for label, name in REFERENCES:
+        ref = load(ref_file(name))
+        if ref:
+            rows.append((label, ref["metrics"], {}, ref["num_samples"], True))
+        else:
+            print(f"skip {label}: missing {ref_file(name)}")
+
+    if not any(is_ref for *_, is_ref in rows):
+        raise SystemExit("No reference captioner results found under results/reference/.")
 
     _figure(rows)
-    _table(rows, flam)
+    _table(rows)
 
 
 def _figure(rows):
-    colors = ["#4C72B0", "#55A868", "#C44E52"]
+    colors = ["#4C72B0", "#55A868", "#C44E52", "#8172B3", "#CCB974"]
     fig, axes = plt.subplots(1, len(METRIC_GROUPS), figsize=(11, 3.6),
                              gridspec_kw={"width_ratios": [len(g[1]) for g in METRIC_GROUPS]})
     for ax, (gname, metrics, ymin) in zip(axes, METRIC_GROUPS):
         x = range(len(metrics))
         n_rows = len(rows)
         w = 0.8 / n_rows
-        for ri, (label, mvals, mstd, _) in enumerate(rows):
+        for ri, (label, mvals, mstd, _, _) in enumerate(rows):
             offs = [xi + (ri - (n_rows - 1) / 2) * w for xi in x]
             heights = [mvals.get(m, 0.0) for m in metrics]
             errs = [mstd.get(m, 0.0) for m in metrics]
@@ -120,7 +133,7 @@ def _figure(rows):
         ticks = [f"{m}\n{'↓' if m in LOWER_BETTER else '↑'}" for m in metrics]
         ax.set_xticks(list(x))
         ax.set_xticklabels(ticks)
-        vals = [mvals.get(m, 0.0) for _, mvals, _, _ in rows for m in metrics]
+        vals = [mv.get(m, 0.0) for _, mv, _, _, _ in rows for m in metrics]
         top = max(0.7, max(vals) * 1.12)
         if ymin is None:  # auto-zoom: floor just below the smallest bar
             lo = min(vals)
@@ -131,7 +144,7 @@ def _figure(rows):
         ax.grid(axis="y", alpha=0.3)
     axes[0].set_ylabel("score")
     axes[-1].legend(frameon=False, loc="upper right")
-    fig.suptitle("Trained GPT-2 pipeline vs zero-shot Audio Flamingo (MusicCaps test)",
+    fig.suptitle("Trained GPT-2 pipeline vs zero-shot reference captioners (MusicCaps test)",
                  fontweight="bold")
     out = FIG_OUT / "fig_reference_comparison.pdf"
     fig.savefig(out)
@@ -143,7 +156,7 @@ def _best_per_metric(rows):
     """metric -> label of the best row (direction-aware)."""
     best = {}
     for m in ALL_METRICS:
-        vals = [(lbl, mv[m]) for lbl, mv, _, _ in rows if m in mv]
+        vals = [(lbl, mv[m]) for lbl, mv, _, _, _ in rows if m in mv]
         if not vals:
             continue
         pick = min if m in LOWER_BETTER else max
@@ -151,13 +164,13 @@ def _best_per_metric(rows):
     return best
 
 
-def _table(rows, flam):
+def _table(rows):
     best = _best_per_metric(rows)
     header = " & ".join(
         f"{m} $\\{'downarrow' if m in LOWER_BETTER else 'uparrow'}$" for m in ALL_METRICS)
 
     lines = []
-    for label, mvals, _, _ in rows:
+    for label, mvals, _, _, is_ref in rows:
         cells = []
         for m in ALL_METRICS:
             v = mvals.get(m)
@@ -165,22 +178,21 @@ def _table(rows, flam):
             if v is not None and best.get(m) == label:
                 s = f"\\textbf{{{s}}}"
             cells.append(s)
-        rowlabel = label + (r"$^{\dagger}$" if label == "Audio Flamingo" else "")
+        rowlabel = label + (r"$^{\dagger}$" if is_ref else "")
         lines.append(f"{rowlabel} & " + " & ".join(cells) + r" \\")
 
-    ns = ", ".join(f"{lbl} $n{{=}}{n}$" for lbl, _, _, n in rows)
+    ns = ", ".join(f"{lbl} $n{{=}}{n}$" for lbl, _, _, n, _ in rows)
     tex = r"""\begin{table*}[t]
 \centering
 \small
 \setlength{\tabcolsep}{4pt}
 \caption{Trained GPT-2 pipeline (stage-1 frozen LM, stage-2 fine-tuned) versus the
-zero-shot \textsc{Audio Flamingo} reference captioner on the shared MusicCaps test
-split. GPT-2 values are the seed-42 point estimate. $\uparrow$/$\downarrow$ mark
-metric direction; best per column in bold. Decoding differs (pipeline greedy
-\texttt{max\_new\_tokens}=64, Flamingo greedy 128) to reflect each model's natural
-output length. $^{\dagger}$\textsc{Audio Flamingo} may have seen MusicCaps in
-pre-training (treat as a reference upper bound, not a clean held-out score).
-Sample counts: """ + ns + r""".}
+zero-shot reference captioners on the shared MusicCaps test split. GPT-2 values are
+the seed-42 point estimate. $\uparrow$/$\downarrow$ mark metric direction; best per
+column in bold. Decoding differs (pipeline greedy \texttt{max\_new\_tokens}=64,
+captioners greedy 128) to reflect each model's natural output length.
+$^{\dagger}$reference captioners may have seen MusicCaps in pre-training (treat as
+reference upper bounds, not clean held-out scores). Sample counts: """ + ns + r""".}
 \label{tab:reference-comparison}
 \begin{tabular}{l""" + "c" * len(ALL_METRICS) + r"""}
 \toprule

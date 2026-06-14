@@ -84,8 +84,10 @@ def main():
         }]
         text = processor.apply_chat_template(
             conversation, add_generation_prompt=True, tokenize=False)
+        # transformers 5.x processor takes `audio=` (singular); the old `audios=`
+        # is silently ignored -> model sees no audio and hallucinates from text.
         inputs = processor(
-            text=text, audios=[audio], sampling_rate=TARGET_SR,
+            text=text, audio=[audio], sampling_rate=TARGET_SR,
             return_tensors="pt", padding=True,
         ).to(model.device)
 

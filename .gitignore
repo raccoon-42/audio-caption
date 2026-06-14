@@ -27,3 +27,6 @@ results/
 *.toc
 *.out
 *.brf
+
+# local secrets (API keys)
+.env

@@ -8,19 +8,27 @@ the pipeline models -> drops into a separate reference-comparison table.
 
 Default model is nvidia/audio-flamingo-next-captioner-hf. --backend selects the
 generation API (each audio-LM family differs); auto-detected from --model-id.
+Local backends (flamingo/qwen) need the Ubuntu GPU box (8B, BF16); the dashscope
+backend is a remote API call (no local weights, runs anywhere the dataset lives).
 
-Run on the Ubuntu GPU box (8B, BF16). Predictions are cached, so re-running
-re-scores without regenerating; pass a fresh --tag to force a new generation.
+Predictions are cached, so re-running re-scores without regenerating; pass a
+fresh --tag to force a new generation.
 """
 
 import argparse
+import base64
+import io
 import json
+import os
+import re
 import tempfile
+import time
 from pathlib import Path
 
 import torch
 import torchaudio
 import yaml
+from dotenv import load_dotenv
 from datasets import load_from_disk
 from tqdm import tqdm
 from transformers import (
@@ -39,6 +47,33 @@ DEFAULT_PROMPT = (
     "audio/recording quality."
 )
 TARGET_SR = 16000
+
+
+def trim_to_words(text, target):
+    """Keep whole sentences until cumulative words >= target, completing the
+    sentence that crosses the line. Drops any trailing incomplete fragment, so
+    output is always sentence-terminated and ~target words (slightly over).
+
+    Used only for the prompt-less Qwen3-Omni captioner, whose long-form output
+    can't be reined in by a prompt the way Flamingo/Qwen2-Audio were -> normalise
+    to the MusicCaps reference length (~50 words) for a fair lexical comparison."""
+    text = text.strip()
+    try:
+        from nltk import sent_tokenize
+        sents = sent_tokenize(text)
+    except Exception:
+        sents = re.split(r"(?<=[.!?])\s+", text)
+    # Complete sentences only (terminal punctuation) -> never cut mid-sentence.
+    sents = [s.strip() for s in sents if s.strip() and s.strip()[-1] in ".!?"]
+    if not sents:
+        return text
+    out, n = [], 0
+    for s in sents:
+        out.append(s)
+        n += len(s.split())
+        if n >= target:
+            break
+    return " ".join(out)
 
 
 def decode_to_16k_mono(audio_decoder):
@@ -114,8 +149,10 @@ class QwenBackend:
         }]
         text = processor.apply_chat_template(
             conversation, add_generation_prompt=True, tokenize=False)
+        # transformers 5.x processor takes `audio=` (singular); the old `audios=`
+        # is silently ignored -> model sees no audio and hallucinates from text.
         inputs = processor(
-            text=text, audios=[audio], sampling_rate=TARGET_SR,
+            text=text, audio=[audio], sampling_rate=TARGET_SR,
             return_tensors="pt", padding=True,
         ).to(model.device)
         with torch.no_grad():
@@ -127,22 +164,98 @@ class QwenBackend:
         )[0].strip()
 
 
-BACKENDS = {"flamingo": FlamingoBackend, "qwen": QwenBackend}
+class DashScopeBackend:
+    """Qwen3-Omni-* via the DashScope OpenAI-compatible API -- no local weights,
+    audio sent base64-encoded over HTTP. The -Captioner variant is single-turn,
+    audio-only and ignores text prompts, so `prompt` is unused here. Key from
+    DASHSCOPE_API_KEY; base URL from DASHSCOPE_BASE_URL (default intl/Singapore).
+
+    audio_payload selects the content shape: "input_audio" (OpenAI-canonical) or
+    "audio_url" (DashScope data-URL form) -- switch via --audio-payload if one
+    is rejected. Audio clips must be <=30 s (MusicCaps clips are 10 s)."""
+
+    DEFAULT_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+
+    def __init__(self, model_id, audio_payload="input_audio"):
+        from openai import OpenAI
+        api_key = os.environ.get("DASHSCOPE_API_KEY")
+        if not api_key:
+            raise SystemExit("Set DASHSCOPE_API_KEY (DashScope / Model Studio key).")
+        # `or` (not .get default): a blank DASHSCOPE_BASE_URL= in .env is an
+        # empty string, which would otherwise override the intl default.
+        base_url = os.environ.get("DASHSCOPE_BASE_URL") or self.DEFAULT_BASE_URL
+        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        self.model_id = model_id
+        self.audio_payload = audio_payload
+        self.usage = {"prompt": 0, "completion": 0, "calls": 0}  # billed tokens
+        # Stub so the caller's `.model.dtype/.device` prints work for both local
+        # and remote backends.
+        self.model = type("RemoteModel", (), {"dtype": "api", "device": base_url})()
+
+    def _audio_content(self, wav):
+        # soundfile, not torchaudio.save: the torchcodec-backed save picks the
+        # container from a file extension and can't write to an in-memory buffer.
+        import soundfile as sf
+        buf = io.BytesIO()
+        sf.write(buf, wav.squeeze(0).numpy(), TARGET_SR, format="WAV", subtype="PCM_16")
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        if self.audio_payload == "audio_url":
+            return {"type": "audio_url",
+                    "audio_url": {"url": f"data:audio/wav;base64,{b64}"}}
+        # DashScope input_audio.data is a data URL, NOT raw base64 (raw base64 is
+        # parsed as a URL and rejected). OpenAI/OpenRouter want raw base64 here --
+        # diverge if this backend is ever pointed at those.
+        return {"type": "input_audio",
+                "input_audio": {"data": f"data:;base64,{b64}", "format": "wav"}}
+
+    def caption(self, wav, prompt, gen_kwargs):
+        messages = [{"role": "user", "content": [self._audio_content(wav)]}]
+        last_err = None
+        for attempt in range(3):  # ride out transient API/network errors
+            try:
+                resp = self.client.chat.completions.create(
+                    model=self.model_id,
+                    messages=messages,
+                    max_tokens=gen_kwargs.get("max_new_tokens", 128),
+                    temperature=0,  # greedy, matches the pipeline's decoding
+                )
+                if resp.usage:
+                    self.usage["prompt"] += resp.usage.prompt_tokens or 0
+                    self.usage["completion"] += resp.usage.completion_tokens or 0
+                    self.usage["calls"] += 1
+                return resp.choices[0].message.content.strip()
+            except Exception as e:
+                last_err = e
+                time.sleep(2 * (attempt + 1))
+        raise last_err
+
+
+BACKENDS = {"flamingo": FlamingoBackend, "qwen": QwenBackend,
+            "dashscope": DashScopeBackend}
 
 
 def resolve_backend(name, model_id):
     if name != "auto":
         return name
-    return "qwen" if "qwen" in model_id.lower() else "flamingo"
+    mid = model_id.lower()
+    if "omni" in mid or "captioner" in mid:  # DashScope slugs (qwen3-omni-*)
+        return "dashscope"
+    return "qwen" if "qwen" in mid else "flamingo"
 
 
 def main():
+    load_dotenv()  # pick up DASHSCOPE_API_KEY / DASHSCOPE_BASE_URL from .env
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/gpt2.yaml",
                         help="Only used for the split seed (must match evaluate.py).")
     parser.add_argument("--model-id", default="nvidia/audio-flamingo-next-captioner-hf")
-    parser.add_argument("--backend", default="auto", choices=["auto", "flamingo", "qwen"],
+    parser.add_argument("--backend", default="auto",
+                        choices=["auto", "flamingo", "qwen", "dashscope"],
                         help="Generation API; auto-detected from --model-id.")
+    parser.add_argument("--audio-payload", default="input_audio",
+                        choices=["input_audio", "audio_url"],
+                        help="dashscope backend only: audio content shape. Switch "
+                             "to audio_url if input_audio is rejected.")
     parser.add_argument("--name", default="audio_flamingo",
                         help="Short name for output dir/filenames.")
     parser.add_argument("--tag", default=None,
@@ -152,6 +265,11 @@ def main():
     parser.add_argument("--repetition-penalty", type=float, default=1.0,
                         help="1.0 = none, matching evaluate.py stage-1 greedy. "
                              "Raise only if outputs degenerate/loop.")
+    parser.add_argument("--trim-words", type=int, default=None,
+                        help="Sentence-aware trim of each hypothesis to ~N words "
+                             "(end-of-sentence boundary). Applied at scoring time "
+                             "(raw output stays cached). For the prompt-less "
+                             "captioner; ~50 matches MusicCaps reference length.")
     parser.add_argument("--limit", type=int, default=None,
                         help="Cap rows (debug); default = full test split.")
     args = parser.parse_args()
@@ -189,6 +307,10 @@ def main():
         prompt = pred_data.get("prompt", args.prompt)
     else:
         prompt = args.prompt
+        # The -Captioner model takes audio only; record that honestly instead of
+        # the unused MusicCaps prompt.
+        if "captioner" in args.model_id.lower():
+            prompt = "(none -- captioner takes audio only)"
         # Reproduce the EXACT test split evaluate.py uses.
         ds = load_from_disk(str(Path(cfg["data_dir"])))
         test_data = ds.train_test_split(test_size=0.1, seed=seed)["test"]
@@ -198,7 +320,10 @@ def main():
 
         backend_name = resolve_backend(args.backend, args.model_id)
         print(f"Loading {args.model_id} (backend: {backend_name}) ...")
-        backend = BACKENDS[backend_name](args.model_id)
+        if backend_name == "dashscope":
+            backend = DashScopeBackend(args.model_id, audio_payload=args.audio_payload)
+        else:
+            backend = BACKENDS[backend_name](args.model_id)
         print("Loaded. dtype:", backend.model.dtype, "device:", backend.model.device)
         print(f"Prompt: {prompt!r}")
         print(f"Gen kwargs: {gen_kwargs}")
@@ -222,6 +347,10 @@ def main():
                     print(f"  Sample {i} ({meta[i].get('ytid')}) failed: {e}")
 
         print(f"Generated {len(hypotheses)}/{len(test_data)} captions ({failed} failed)")
+        if getattr(backend, "usage", None):
+            u = backend.usage
+            print(f"API usage: {u['calls']} calls, {u['prompt']} prompt + "
+                  f"{u['completion']} completion = {u['prompt'] + u['completion']} tokens")
         predictions = [
             {"reference": r, "hypothesis": h} for r, h in zip(references, hypotheses)
         ]
@@ -238,8 +367,18 @@ def main():
             }, f, indent=2)
         print(f"Predictions cached to {pred_path}")
 
+    # Trim at scoring time so the cached predictions stay raw -- re-running with a
+    # different --trim-words re-scores from cache without re-calling the API.
+    scored_hyps = hypotheses
+    if args.trim_words:
+        scored_hyps = [trim_to_words(h, args.trim_words) for h in hypotheses]
+        print(f"Trimmed hypotheses to ~{args.trim_words} words (sentence-aware).")
+    scored_predictions = [
+        {"reference": r, "hypothesis": h} for r, h in zip(references, scored_hyps)
+    ]
+
     print("Computing metrics...")
-    metrics = compute_metrics(references, hypotheses)
+    metrics = compute_metrics(references, scored_hyps)
     for k, v in metrics.items():
         print(f"  {k}: {v:.4f}")
 
@@ -251,8 +390,9 @@ def main():
         "num_samples": len(hypotheses),
         "num_failed": failed,
         "gen_kwargs": gen_kwargs,
+        "trim_words": args.trim_words,
         "metrics": metrics,
-        "predictions": predictions,
+        "predictions": scored_predictions,
     }
     out_path = base_dir / f"{args.name}_metrics_{tag}.json"
     with open(out_path, "w") as f:
