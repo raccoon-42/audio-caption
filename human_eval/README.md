@@ -1,0 +1,82 @@
+# Human evaluation (pairwise A-vs-B)
+
+Pairwise human study for the music-captioning thesis. Raters hear a 10s clip
+and pick the better of two blinded captions on two axes (more accurate / less
+wrong). Produces inter-rater Fleiss' kappa plus win-rates.
+
+## Design
+
+- **16 pairs**, every rater rates the same block (~5 min):
+  - 6 x GPT-2 best-decoding (`trim_ngram2`, FENSE 0.580) vs human MusicCaps reference
+  - 6 x GPT-2 best vs T5 best-decoding (`trim_rep1.2`, FENSE 0.576)
+  - 4 x sanity (reference vs a reference written for a different clip)
+- **2 questions/pair**: Q1 more accurate, Q2 less wrong. Answers A / B / Tie.
+- **10 raters** → Fleiss' kappa is computed on the shared block; win-rates on
+  the two comparison types; sanity pairs filter inattentive raters.
+- Expectation: GPT-2-vs-T5 is a statistical tie on FENSE, so it will likely be
+  ~50/50 with humans too — itself a reportable corroboration.
+
+## 1. Build the study
+
+```
+uv run python human_eval/prepare_study.py
+```
+
+Writes `site/data/pairs.json` (rater-facing, blinded), `site/audio/clip_*.mp3`
+(transcoded), and `human_eval/key.json` (private system mapping; **never
+published**). Pair ids are opaque (`p00`..`p15`) so the page does not reveal
+which pairs are sanity checks. Defaults pick the top-FENSE decoding config per
+model; override with `--pred-best` / `--pred-t5` / `--n-*` if needed.
+
+## 2. Collect responses (Apps Script + Google Sheet)
+
+1. Create a Google Sheet. **Extensions > Apps Script**, paste
+   `human_eval/apps_script.gs`, save.
+2. **Deploy > New deployment > Web app**. Execute as: *Me*. Who has access:
+   *Anyone*. Copy the Web app URL.
+3. Paste that URL into `site/config.js` (`window.EVAL_ENDPOINT`).
+
+Each submission appends one row per pair to the Sheet. The site also downloads
+a `results_<rater>.json` as a fallback in case a POST fails.
+
+## 3. Publish the site (GitHub Pages)
+
+The site is fully static. Easiest path that keeps `key.json` private: publish a
+**separate repo** containing only the contents of `human_eval/site/`.
+
+```
+# from a fresh clone of a new public repo
+cp -r /path/to/audio-caption/human_eval/site/* .
+git add . && git commit -m "music caption eval" && git push
+```
+
+Then enable **Settings > Pages > Deploy from branch > main / root**. Share the
+Pages URL with the 10 raters. `key.json` stays in the thesis repo only.
+
+(MusicCaps clips are public YouTube-sourced segments; publishing 16 short clips
+for a research study is standard, but keep the site unlisted/shared by link.)
+
+## 4. Analyse
+
+Export the Sheet to CSV (File > Download > CSV) and/or collect the fallback
+JSON files into a folder, then:
+
+```
+uv run python human_eval/compute_kappa.py --csv responses.csv
+# or
+uv run python human_eval/compute_kappa.py --json-dir human_eval/responses
+```
+
+Reports: per-rater sanity accuracy (raters below 0.75 are dropped), Fleiss'
+kappa and mean pairwise Cohen's kappa for Q1 and Q2, and win-rates per
+comparison.
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `prepare_study.py` | build pairs + transcode clips + write key |
+| `site/` | static study (publish this) |
+| `apps_script.gs` | Google Sheet collector |
+| `compute_kappa.py` | Fleiss/Cohen kappa + win-rates + sanity filter |
+| `key.json` | private id→system map (do not publish) |

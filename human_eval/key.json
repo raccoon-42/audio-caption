@@ -1,0 +1,118 @@
+[
+  {
+    "id": "p00",
+    "pair_type": "ref_best",
+    "clip": "s2iIZ2WNuKY_10.00_20.00",
+    "systemA": "reference",
+    "systemB": "gpt2_best"
+  },
+  {
+    "id": "p01",
+    "pair_type": "ref_best",
+    "clip": "hZfCziBaGTI_0.00_10.00",
+    "systemA": "reference",
+    "systemB": "gpt2_best"
+  },
+  {
+    "id": "p02",
+    "pair_type": "ref_best",
+    "clip": "5D4siJjh1j0_30.00_40.00",
+    "systemA": "reference",
+    "systemB": "gpt2_best"
+  },
+  {
+    "id": "p03",
+    "pair_type": "ref_best",
+    "clip": "7pdrGzdWMzI_50.00_60.00",
+    "systemA": "reference",
+    "systemB": "gpt2_best"
+  },
+  {
+    "id": "p04",
+    "pair_type": "ref_best",
+    "clip": "O8EMm4QJjeo_0.00_10.00",
+    "systemA": "gpt2_best",
+    "systemB": "reference"
+  },
+  {
+    "id": "p05",
+    "pair_type": "ref_best",
+    "clip": "VzYc-c-uHjI_30.00_40.00",
+    "systemA": "gpt2_best",
+    "systemB": "reference"
+  },
+  {
+    "id": "p06",
+    "pair_type": "gpt2_t5",
+    "clip": "C3s-DmHtDUg_20.00_30.00",
+    "systemA": "gpt2_best",
+    "systemB": "t5_best"
+  },
+  {
+    "id": "p07",
+    "pair_type": "gpt2_t5",
+    "clip": "_yXtw_z2xf4_40.00_50.00",
+    "systemA": "t5_best",
+    "systemB": "gpt2_best"
+  },
+  {
+    "id": "p08",
+    "pair_type": "gpt2_t5",
+    "clip": "DYp8940tHso_0.00_10.00",
+    "systemA": "t5_best",
+    "systemB": "gpt2_best"
+  },
+  {
+    "id": "p09",
+    "pair_type": "gpt2_t5",
+    "clip": "Mf6Ql55o7Es_30.00_40.00",
+    "systemA": "gpt2_best",
+    "systemB": "t5_best"
+  },
+  {
+    "id": "p10",
+    "pair_type": "gpt2_t5",
+    "clip": "9kt7rsziUVQ_140.00_150.00",
+    "systemA": "t5_best",
+    "systemB": "gpt2_best"
+  },
+  {
+    "id": "p11",
+    "pair_type": "gpt2_t5",
+    "clip": "PF6Mn51Nkvs_30.00_40.00",
+    "systemA": "t5_best",
+    "systemB": "gpt2_best"
+  },
+  {
+    "id": "p12",
+    "pair_type": "sanity",
+    "clip": "c3T1gWSVp6c_140.00_150.00",
+    "systemA": "ref_mismatch",
+    "systemB": "ref_correct",
+    "correct_side": "B"
+  },
+  {
+    "id": "p13",
+    "pair_type": "sanity",
+    "clip": "PvHKu1XRSJ0_0.00_10.00",
+    "systemA": "ref_mismatch",
+    "systemB": "ref_correct",
+    "correct_side": "B"
+  },
+  {
+    "id": "p14",
+    "pair_type": "sanity",
+    "clip": "l1coM570kVw_30.00_40.00",
+    "systemA": "ref_mismatch",
+    "systemB": "ref_correct",
+    "correct_side": "B"
+  },
+  {
+    "id": "p15",
+    "pair_type": "sanity",
+    "clip": "AuG9i5cwGW0_230.00_240.00",
+    "systemA": "ref_mismatch",
+    "systemB": "ref_correct",
+    "correct_side": "B"
+  }
+]
