@@ -55,12 +55,15 @@ GPT2_S1_FILES = [ARCH / "gpt2_ablation_gpt2_s1.json",
 GPT2_S2_FILES = [ARCH / "gpt2_ablation_gpt2.json",
                  ARCH / "gpt2_ablation_gpt2_seed43.json",
                  ARCH / "gpt2_ablation_gpt2_seed44.json"]
-# Reference captioners: (display label, results/reference/<name>/ dir). The
-# metrics file is <name>_metrics_<name>.json (tag defaults to name).
+# Reference captioners: (display label, results/reference/<name>/ dir, leaks).
+# The metrics file is <name>_metrics_<name>.json (tag defaults to name). `leaks`
+# marks rows that may have seen MusicCaps in training -> daggered upper bounds.
+# LP-MusicCaps (pretrain) trained ONLY on MSD pseudo-captions -> leakage-free.
 REFERENCES = [
-    ("Audio Flamingo", "audio_flamingo"),
-    ("Qwen2-Audio", "qwen2_audio"),
-    ("Qwen3-Omni Captioner", "qwen3_omni_captioner"),
+    ("Audio Flamingo", "audio_flamingo", True),
+    ("Qwen2-Audio", "qwen2_audio", True),
+    ("Qwen3-Omni Captioner", "qwen3_omni_captioner", True),
+    ("LP-MusicCaps (pretrain)", "lp_music_caps", False),
 ]
 
 
@@ -96,19 +99,19 @@ def main():
     if s1_metrics is None:
         raise SystemExit("Missing GPT-2 S1 baseline eval JSONs.")
 
-    # rows: (label, metrics dict, per-metric std dict, n, is_reference)
-    rows = [("GPT-2 (S1)", s1_metrics, s1_std, load(GPT2_S1_FILES[0])["num_samples"], False)]
+    # rows: (label, metrics dict, per-metric std dict, n, is_reference, leaks)
+    rows = [("GPT-2 (S1)", s1_metrics, s1_std, load(GPT2_S1_FILES[0])["num_samples"], False, False)]
     if s2_metrics:
-        rows.append(("GPT-2 (S2)", s2_metrics, s2_std, load(GPT2_S2_FILES[0])["num_samples"], False))
+        rows.append(("GPT-2 (S2)", s2_metrics, s2_std, load(GPT2_S2_FILES[0])["num_samples"], False, False))
 
-    for label, name in REFERENCES:
+    for label, name, leaks in REFERENCES:
         ref = load(ref_file(name))
         if ref:
-            rows.append((label, ref["metrics"], {}, ref["num_samples"], True))
+            rows.append((label, ref["metrics"], {}, ref["num_samples"], True, leaks))
         else:
             print(f"skip {label}: missing {ref_file(name)}")
 
-    if not any(is_ref for *_, is_ref in rows):
+    if not any(is_ref for *_, is_ref, _leaks in rows):
         raise SystemExit("No reference captioner results found under results/reference/.")
 
     _figure(rows)
@@ -116,14 +119,14 @@ def main():
 
 
 def _figure(rows):
-    colors = ["#4C72B0", "#55A868", "#C44E52", "#8172B3", "#CCB974"]
+    colors = ["#4C72B0", "#55A868", "#C44E52", "#8172B3", "#CCB974", "#64B5CD"]
     fig, axes = plt.subplots(1, len(METRIC_GROUPS), figsize=(11, 3.6),
                              gridspec_kw={"width_ratios": [len(g[1]) for g in METRIC_GROUPS]})
     for ax, (gname, metrics, ymin) in zip(axes, METRIC_GROUPS):
         x = range(len(metrics))
         n_rows = len(rows)
         w = 0.8 / n_rows
-        for ri, (label, mvals, mstd, _, _) in enumerate(rows):
+        for ri, (label, mvals, mstd, _, _, _) in enumerate(rows):
             offs = [xi + (ri - (n_rows - 1) / 2) * w for xi in x]
             heights = [mvals.get(m, 0.0) for m in metrics]
             errs = [mstd.get(m, 0.0) for m in metrics]
@@ -133,7 +136,7 @@ def _figure(rows):
         ticks = [f"{m}\n{'↓' if m in LOWER_BETTER else '↑'}" for m in metrics]
         ax.set_xticks(list(x))
         ax.set_xticklabels(ticks)
-        vals = [mv.get(m, 0.0) for _, mv, _, _, _ in rows for m in metrics]
+        vals = [mv.get(m, 0.0) for _, mv, _, _, _, _ in rows for m in metrics]
         top = max(0.7, max(vals) * 1.12)
         if ymin is None:  # auto-zoom: floor just below the smallest bar
             lo = min(vals)
@@ -160,7 +163,7 @@ def _best_per_metric(rows):
     """metric -> label of the best row (direction-aware)."""
     best = {}
     for m in ALL_METRICS:
-        vals = [(lbl, mv[m]) for lbl, mv, _, _, _ in rows if m in mv]
+        vals = [(lbl, mv[m]) for lbl, mv, _, _, _, _ in rows if m in mv]
         if not vals:
             continue
         pick = min if m in LOWER_BETTER else max
@@ -174,7 +177,7 @@ def _table(rows):
         f"{m} $\\{'downarrow' if m in LOWER_BETTER else 'uparrow'}$" for m in ALL_METRICS)
 
     lines = []
-    for label, mvals, _, _, is_ref in rows:
+    for label, mvals, _, _, _, leaks in rows:
         cells = []
         for m in ALL_METRICS:
             v = mvals.get(m)
@@ -182,10 +185,10 @@ def _table(rows):
             if v is not None and best.get(m) == label:
                 s = f"\\textbf{{{s}}}"
             cells.append(s)
-        rowlabel = label + (r"$^{\dagger}$" if is_ref else "")
+        rowlabel = label + (r"$^{\dagger}$" if leaks else "")
         lines.append(f"{rowlabel} & " + " & ".join(cells) + r" \\")
 
-    ns = ", ".join(f"{lbl} $n{{=}}{n}$" for lbl, _, _, n, _ in rows)
+    ns = ", ".join(f"{lbl} $n{{=}}{n}$" for lbl, _, _, n, _, _ in rows)
     tex = r"""\begin{table*}[t]
 \centering
 \small
@@ -195,8 +198,9 @@ zero-shot reference captioners on the shared MusicCaps test split. GPT-2 values 
 the seed-42 point estimate. $\uparrow$/$\downarrow$ mark metric direction; best per
 column in bold. Decoding differs (pipeline greedy \texttt{max\_new\_tokens}=64,
 captioners greedy 128) to reflect each model's natural output length.
-$^{\dagger}$reference captioners may have seen MusicCaps in pre-training (treat as
-reference upper bounds, not clean held-out scores). Sample counts: """ + ns + r""".}
+$^{\dagger}$may have seen MusicCaps in pre-training (treat as reference upper
+bounds, not clean held-out scores); LP-MusicCaps (pretrain) trained only on MSD
+pseudo-captions, so it is leakage-free on this split. Sample counts: """ + ns + r""".}
 \label{tab:reference-comparison}
 \begin{tabular}{l""" + "c" * len(ALL_METRICS) + r"""}
 \toprule

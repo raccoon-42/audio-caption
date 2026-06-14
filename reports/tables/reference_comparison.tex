@@ -7,8 +7,9 @@ zero-shot reference captioners on the shared MusicCaps test split. GPT-2 values 
 the seed-42 point estimate. $\uparrow$/$\downarrow$ mark metric direction; best per
 column in bold. Decoding differs (pipeline greedy \texttt{max\_new\_tokens}=64,
 captioners greedy 128) to reflect each model's natural output length.
-$^{\dagger}$reference captioners may have seen MusicCaps in pre-training (treat as
-reference upper bounds, not clean held-out scores). Sample counts: GPT-2 (S1) $n{=}529$, GPT-2 (S2) $n{=}529$, Audio Flamingo $n{=}529$, Qwen2-Audio $n{=}529$, Qwen3-Omni Captioner $n{=}528$.}
+$^{\dagger}$may have seen MusicCaps in pre-training (treat as reference upper
+bounds, not clean held-out scores); LP-MusicCaps (pretrain) trained only on MSD
+pseudo-captions, so it is leakage-free on this split. Sample counts: GPT-2 (S1) $n{=}529$, GPT-2 (S2) $n{=}529$, Audio Flamingo $n{=}529$, Qwen2-Audio $n{=}529$, Qwen3-Omni Captioner $n{=}528$, LP-MusicCaps (pretrain) $n{=}529$.}
 \label{tab:reference-comparison}
 \begin{tabular}{lcccccccccc}
 \toprule
@@ -19,6 +20,7 @@ GPT-2 (S2) & 0.309 & 0.063 & 0.126 & 0.233 & 0.111 & 0.109 & 0.110 & 0.582 & 0.3
 Audio Flamingo$^{\dagger}$ & 0.206 & 0.010 & 0.111 & 0.169 & 0.028 & 0.070 & 0.049 & 0.586 & 0.278 & 0.440 \\
 Qwen2-Audio$^{\dagger}$ & \textbf{0.426} & \textbf{0.141} & \textbf{0.188} & \textbf{0.325} & \textbf{0.472} & \textbf{0.205} & \textbf{0.338} & \textbf{0.713} & \textbf{0.074} & \textbf{0.665} \\
 Qwen3-Omni Captioner$^{\dagger}$ & 0.203 & 0.006 & 0.094 & 0.157 & 0.025 & 0.051 & 0.038 & 0.533 & 0.280 & 0.396 \\
+LP-MusicCaps (pretrain) & 0.173 & 0.005 & 0.056 & 0.129 & 0.007 & 0.037 & 0.022 & 0.437 & 0.149 & 0.378 \\
 \bottomrule
 \end{tabular}
 \end{table*}
