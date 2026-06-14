@@ -143,7 +143,11 @@ def _figure(rows):
         ax.set_ylim(ymin, top)
         ax.grid(axis="y", alpha=0.3)
     axes[0].set_ylabel("score")
-    axes[-1].legend(frameon=False, loc="upper right")
+    # Figure-level legend below the panels: an in-axes legend collides with the
+    # tall SBERT/FENSE bars in the AAC panel.
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, frameon=False, ncol=len(rows),
+               loc="upper center", bbox_to_anchor=(0.5, 0.02))
     fig.suptitle("Trained GPT-2 pipeline vs zero-shot reference captioners (MusicCaps test)",
                  fontweight="bold")
     out = FIG_OUT / "fig_reference_comparison.pdf"
