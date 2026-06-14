@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Music Caption Evaluation</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="app">
+
+  <section id="intro" class="card">
+    <h1>Music caption evaluation</h1>
+    <p>You will hear short (10-second) music clips. For each clip you see
+       <b>two</b> text descriptions, Caption A and Caption B. Listen to the
+       clip, then answer two questions about the captions.</p>
+    <ul>
+      <li><b>Q1 — More accurate:</b> which caption describes the music with
+          <i>more correct</i> details?</li>
+      <li><b>Q2 — Less wrong:</b> which caption says <i>fewer incorrect</i>
+          things about the music (fewer made-up details)?</li>
+    </ul>
+    <p>These can have different answers. A long caption may get more details
+       right (good for Q1) but also include more mistakes (bad for Q2).
+       Pick <b>Tie</b> only when you genuinely cannot choose.</p>
+    <p>It takes about 5 minutes. Please use headphones if you can.</p>
+    <label>Your name or an ID (so we can track responses):
+      <input id="rater" type="text" autocomplete="off" placeholder="e.g. ali">
+    </label>
+    <button id="start">Start</button>
+  </section>
+
+  <section id="task" class="card hidden">
+    <div id="progress"></div>
+    <audio id="player" controls preload="auto"></audio>
+    <p id="listen-hint" class="hint">Play the clip to unlock the questions.</p>
+
+    <div class="captions">
+      <div class="caption"><span class="tag">Caption A</span><p id="capA"></p></div>
+      <div class="caption"><span class="tag">Caption B</span><p id="capB"></p></div>
+    </div>
+
+    <fieldset id="q1" disabled>
+      <legend>Q1 — Which is <b>more accurate</b> (more correct details)?</legend>
+      <label><input type="radio" name="q1" value="A"> Caption A</label>
+      <label><input type="radio" name="q1" value="tie"> Tie</label>
+      <label><input type="radio" name="q1" value="B"> Caption B</label>
+    </fieldset>
+
+    <fieldset id="q2" disabled>
+      <legend>Q2 — Which is <b>less wrong</b> (fewer made-up details)?</legend>
+      <label><input type="radio" name="q2" value="A"> Caption A</label>
+      <label><input type="radio" name="q2" value="tie"> Tie</label>
+      <label><input type="radio" name="q2" value="B"> Caption B</label>
+    </fieldset>
+
+    <button id="next" disabled>Next</button>
+  </section>
+
+  <section id="done" class="card hidden">
+    <h1>Thank you</h1>
+    <p id="submit-status"></p>
+    <p>A backup file <code id="fname"></code> was also downloaded. If asked,
+       send it back to the researcher.</p>
+    <button id="redownload">Download again</button>
+  </section>
+
+</main>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
