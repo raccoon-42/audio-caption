@@ -21,8 +21,13 @@
           things about the music (fewer made-up details)?</li>
     </ul>
     <p>These can have different answers. A long caption may get more details
-       right (good for Q1) but also include more mistakes (bad for Q2).
-       Pick <b>Tie</b> only when you genuinely cannot choose.</p>
+       right (good for Q1) but also include more mistakes (bad for Q2).</p>
+    <p>Two ways to not pick a side:</p>
+    <ul>
+      <li><b>Tie</b> — both captions are about equally good or equally bad.</li>
+      <li><b>Can't tell</b> — you don't have the musical knowledge to judge.
+          Pick this instead of guessing.</li>
+    </ul>
     <p>It takes about 5 minutes. Please use headphones if you can.</p>
     <label>Your name or an ID (so we can track responses):
       <input id="rater" type="text" autocomplete="off" placeholder="e.g. ali">
@@ -45,6 +50,7 @@
       <label><input type="radio" name="q1" value="A"> Caption A</label>
       <label><input type="radio" name="q1" value="tie"> Tie</label>
       <label><input type="radio" name="q1" value="B"> Caption B</label>
+      <label><input type="radio" name="q1" value="cant_tell"> Can't tell</label>
     </fieldset>
 
     <fieldset id="q2" disabled>
@@ -52,6 +58,7 @@
       <label><input type="radio" name="q2" value="A"> Caption A</label>
       <label><input type="radio" name="q2" value="tie"> Tie</label>
       <label><input type="radio" name="q2" value="B"> Caption B</label>
+      <label><input type="radio" name="q2" value="cant_tell"> Can't tell</label>
     </fieldset>
 
     <button id="next" disabled>Next</button>

@@ -130,18 +130,25 @@ def main():
     for q_idx, q_name in [(0, "Q1 (more accurate)"), (1, "Q2 (less wrong)")]:
         item_ratings = defaultdict(list)
         rater_item_cat = defaultdict(dict)
+        n_total = n_abstain = 0
         for (rater, pid), ans in dedup.items():
             if rater not in kept_set or pid not in key:
                 continue
             if key[pid]["pair_type"] == "sanity":
                 continue
             cat = ans[q_idx]
-            if cat in CATS:
+            n_total += 1
+            if cat == "cant_tell":
+                n_abstain += 1          # excluded from kappa, reported below
+            elif cat in CATS:
                 item_ratings[pid].append(cat)
                 rater_item_cat[rater][pid] = cat
         fk, n_items = fleiss_kappa(item_ratings)
         ck = mean_pairwise_cohen(rater_item_cat)
         print(f"=== {q_name} ===")
+        if n_total:
+            print(f"  'can't tell' abstentions: {n_abstain}/{n_total} "
+                  f"({n_abstain / n_total:.0%})  [excluded from kappa]")
         print(f"  Fleiss' kappa = {fk:.3f} over {n_items} items"
               if fk is not None else "  no data")
         if ck is not None:

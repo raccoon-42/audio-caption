@@ -10,7 +10,9 @@ wrong). Produces inter-rater Fleiss' kappa plus win-rates.
   - 6 x GPT-2 best-decoding (`trim_ngram2`, FENSE 0.580) vs human MusicCaps reference
   - 6 x GPT-2 best vs T5 best-decoding (`trim_rep1.2`, FENSE 0.576)
   - 4 x sanity (reference vs a reference written for a different clip)
-- **2 questions/pair**: Q1 more accurate, Q2 less wrong. Answers A / B / Tie.
+- **2 questions/pair**: Q1 more accurate, Q2 less wrong. Answers A / B / Tie /
+  Can't tell. "Can't tell" (no musical knowledge to judge) is an abstention,
+  excluded from kappa and reported as an abstention rate.
 - **10 raters** → Fleiss' kappa is computed on the shared block; win-rates on
   the two comparison types; sanity pairs filter inattentive raters.
 - Expectation: GPT-2-vs-T5 is a statistical tie on FENSE, so it will likely be
