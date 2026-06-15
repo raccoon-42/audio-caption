@@ -73,6 +73,25 @@ Reports: per-rater sanity accuracy (raters below 0.75 are dropped), Fleiss'
 kappa and mean pairwise Cohen's kappa for Q1 and Q2, and win-rates per
 comparison.
 
+The same script ingests the LLM-judge panels (same `{rater, responses}` schema)
+and reports llm-vs-human agreement. One condition per `--llm-dir`:
+
+```
+# llm-llm only (no human data needed)
+uv run python human_eval/compute_kappa.py --llm-dir results/llm_judge/audio
+uv run python human_eval/compute_kappa.py --llm-dir results/llm_judge/text
+
+# all three: human-human + llm-llm + llm-vs-human consensus
+uv run python human_eval/compute_kappa.py --csv responses.csv \
+    --llm-dir results/llm_judge/audio
+```
+
+Humans heard the clip, so the **audio** panel is the natural comparator; the
+text panel only covers the `gpt2_t5` caption-vs-caption pairs (no audio, so no
+sanity pairs — those judges are kept unfiltered). Cross-pool agreement reduces
+each pool to a per-pair plurality label; within-pool ties are "undecided" and
+excluded from the Cohen's kappa, reported separately.
+
 ## Files
 
 | File | Purpose |
@@ -80,5 +99,5 @@ comparison.
 | `prepare_study.py` | build pairs + transcode clips + write key |
 | `site/` | static study (publish this) |
 | `apps_script.gs` | Google Sheet collector |
-| `compute_kappa.py` | Fleiss/Cohen kappa + win-rates + sanity filter |
+| `compute_kappa.py` | Fleiss/Cohen kappa + win-rates + sanity filter + llm-vs-human consensus |
 | `key.json` | private id→system map (do not publish) |

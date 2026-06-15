@@ -1,22 +1,36 @@
-"""Analyse the pairwise human-eval responses.
+"""Analyse the pairwise human-eval responses and the LLM-judge panels.
 
-Reads responses from a Sheet CSV export (--csv) and/or downloaded per-rater
-JSON files (--json-dir), joins them to key.json, and reports:
-  - Fleiss' kappa among raters for Q1 and Q2 (protocol reliability)
-  - per-rater sanity-check accuracy (data-quality filter)
-  - win-rates per comparison (the result)
+Reads two independent rater pools and reports agreement within and across them:
+  - human pool from a Sheet CSV export (--csv) and/or per-rater JSON (--json-dir)
+  - LLM-judge panel from a directory of judge JSON files (--llm-dir), e.g.
+    results/llm_judge/audio or results/llm_judge/text (one condition per run)
 
-Categories are {A, B, tie}. A rater below --sanity-threshold on the sanity
-pairs is dropped before computing kappa and win-rates.
+Both file shapes share the {rater, responses: {pid: {q1, q2}}} schema, so the
+same loader ingests either. For each present pool it reports, per question:
+  - per-rater sanity-check accuracy (data-quality filter; raters below
+    --sanity-threshold are dropped before everything else)
+  - Fleiss' kappa + mean pairwise Cohen's kappa among the kept raters
+  - 'can't tell' abstention rate (excluded from kappa)
+  - win-rates per comparison type
+
+When both pools are present it also reports llm-vs-human consensus: each pool is
+reduced to a per-pair plurality label (a within-pool tie is "undecided" and
+excluded, reported separately), then Cohen's kappa + raw agreement on the pairs
+where both pools are decisive.
+
+Categories are {A, B, tie}. Humans heard the clip, so the audio LLM panel is the
+natural comparator; run --llm-dir results/llm_judge/text separately for the
+text-only panel.
 """
 import argparse
 import csv
 import json
-from collections import defaultdict
+from collections import Counter, defaultdict
 from itertools import combinations
 from pathlib import Path
 
 CATS = ["A", "B", "tie"]
+QUESTIONS = [(0, "Q1 (more accurate)"), (1, "Q2 (less wrong)")]
 
 
 def load_csv(path, rows):
@@ -84,31 +98,21 @@ def mean_pairwise_cohen(rater_item_cat):
     return sum(vals) / len(vals) if vals else None
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--csv", help="Sheet export")
-    ap.add_argument("--json-dir", help="dir of downloaded results_*.json")
-    ap.add_argument("--key", default="human_eval/key.json")
-    ap.add_argument("--sanity-threshold", type=float, default=0.75)
-    args = ap.parse_args()
+def majority(cats):
+    """Plurality label over a list of categories. None on an empty list or a
+    strict tie for first place (undecided)."""
+    counts = Counter(cats).most_common()
+    if not counts:
+        return None
+    if len(counts) > 1 and counts[0][1] == counts[1][1]:
+        return None
+    return counts[0][0]
 
-    if not args.csv and not args.json_dir:
-        raise SystemExit("provide --csv and/or --json-dir")
 
-    raw = []
-    if args.csv:
-        load_csv(args.csv, raw)
-    if args.json_dir:
-        load_json_dir(args.json_dir, raw)
-
-    # Dedup by (rater, pair_id); last write wins.
-    dedup = {(rater, pid): (q1, q2) for rater, pid, q1, q2 in raw}
-    key = {k["id"]: k for k in json.loads(Path(args.key).read_text())}
-
-    # Sanity accuracy per rater (Q1 picking the matching caption).
-    sanity_ids = [i for i, k in key.items() if k["pair_type"] == "sanity"]
+def sanity_keep(dedup, key, sanity_ids, threshold, label):
+    """Print per-rater sanity accuracy for a pool, return the kept-rater set."""
     rater_ids = sorted({r for r, _ in dedup})
-    print("=== sanity-check accuracy (Q1) ===")
+    print(f"=== {label}: sanity-check accuracy (Q1) ===")
     kept = []
     for rater in rater_ids:
         hits = tot = 0
@@ -117,17 +121,26 @@ def main():
                 tot += 1
                 if dedup[(rater, sid)][0] == key[sid].get("correct_side"):
                     hits += 1
-        acc = hits / tot if tot else 0.0
-        flag = "" if acc >= args.sanity_threshold else "  <-- DROPPED"
-        print(f"  {rater:12s} {hits}/{tot} = {acc:.2f}{flag}")
-        if acc >= args.sanity_threshold:
+        if tot == 0:
+            # No sanity pairs shown to this rater (e.g. the text-only LLM panel,
+            # where sanity needs the audio). Can't assess, so keep.
+            print(f"  {rater:20s} 0/0 = n/a (no sanity pairs; kept)")
+            kept.append(rater)
+            continue
+        acc = hits / tot
+        flag = "" if acc >= threshold else "  <-- DROPPED"
+        print(f"  {rater:20s} {hits}/{tot} = {acc:.2f}{flag}")
+        if acc >= threshold:
             kept.append(rater)
     print(f"kept {len(kept)}/{len(rater_ids)} raters\n")
+    return set(kept)
 
-    kept_set = set(kept)
 
-    # Fleiss + Cohen on the non-sanity pairs, per question.
-    for q_idx, q_name in [(0, "Q1 (more accurate)"), (1, "Q2 (less wrong)")]:
+def analyze_pool(dedup, kept_set, key, label):
+    """Print within-pool Fleiss/Cohen per question and return the per-pair
+    plurality consensus: {q_idx: {pid: cat}} over kept, decisive pairs only."""
+    consensus = {}
+    for q_idx, q_name in QUESTIONS:
         item_ratings = defaultdict(list)
         rater_item_cat = defaultdict(dict)
         n_total = n_abstain = 0
@@ -145,7 +158,7 @@ def main():
                 rater_item_cat[rater][pid] = cat
         fk, n_items = fleiss_kappa(item_ratings)
         ck = mean_pairwise_cohen(rater_item_cat)
-        print(f"=== {q_name} ===")
+        print(f"=== {label}: {q_name} ===")
         if n_total:
             print(f"  'can't tell' abstentions: {n_abstain}/{n_total} "
                   f"({n_abstain / n_total:.0%})  [excluded from kappa]")
@@ -154,9 +167,13 @@ def main():
         if ck is not None:
             print(f"  mean pairwise Cohen's kappa = {ck:.3f}")
         print()
+        consensus[q_idx] = {pid: majority(cats)
+                            for pid, cats in item_ratings.items()}
+    return consensus
 
-    # Win-rates per comparison (kept raters).
-    print("=== win-rates (kept raters) ===")
+
+def win_rates(dedup, kept, key, label):
+    print(f"=== {label}: win-rates (kept raters) ===")
     for ptype in ["ref_best", "gpt2_t5"]:
         ids = [i for i, k in key.items() if k["pair_type"] == ptype]
         for q_idx, q_name in [(0, "Q1"), (1, "Q2")]:
@@ -179,6 +196,71 @@ def main():
                                   for k, v in sorted(tally.items()))
                 print(f"  {ptype} {q_name}: {parts}")
     print()
+
+
+def cross_consensus(cons_a, label_a, cons_b, label_b):
+    """Cohen's kappa + raw agreement between two pools' consensus labels."""
+    print(f"=== {label_a} vs {label_b}: consensus agreement ===")
+    for q_idx, q_name in QUESTIONS:
+        a, b = cons_a.get(q_idx, {}), cons_b.get(q_idx, {})
+        shared = sorted(set(a) & set(b))
+        decisive = [(a[p], b[p]) for p in shared
+                    if a[p] is not None and b[p] is not None]
+        undecided = len(shared) - len(decisive)
+        if not decisive:
+            print(f"  {q_name}: no pairs decisive in both pools "
+                  f"({undecided} undecided)")
+            continue
+        xs = [x for x, _ in decisive]
+        ys = [y for _, y in decisive]
+        ck = cohen_kappa(xs, ys)
+        raw = sum(1 for x, y in decisive if x == y) / len(decisive)
+        print(f"  {q_name}: Cohen's kappa = {ck:.3f}, raw agreement = "
+              f"{raw:.0%} over {len(decisive)} pairs "
+              f"({undecided} undecided, excluded)")
+    print()
+
+
+def load_pool(csv_path, json_dir):
+    raw = []
+    if csv_path:
+        load_csv(csv_path, raw)
+    if json_dir:
+        load_json_dir(json_dir, raw)
+    # Dedup by (rater, pair_id); last write wins.
+    return {(rater, pid): (q1, q2) for rater, pid, q1, q2 in raw}
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--csv", help="human Sheet export")
+    ap.add_argument("--json-dir", help="dir of human results_*.json")
+    ap.add_argument("--llm-dir", help="dir of LLM-judge JSON (one condition)")
+    ap.add_argument("--key", default="human_eval/key.json")
+    ap.add_argument("--sanity-threshold", type=float, default=0.75)
+    args = ap.parse_args()
+
+    if not args.csv and not args.json_dir and not args.llm_dir:
+        raise SystemExit("provide at least one of --csv / --json-dir / --llm-dir")
+
+    key = {k["id"]: k for k in json.loads(Path(args.key).read_text())}
+    sanity_ids = [i for i, k in key.items() if k["pair_type"] == "sanity"]
+
+    human = load_pool(args.csv, args.json_dir) if (args.csv or args.json_dir) else {}
+    llm = load_pool(None, args.llm_dir) if args.llm_dir else {}
+
+    human_cons = llm_cons = None
+    if human:
+        kept = sanity_keep(human, key, sanity_ids, args.sanity_threshold, "human")
+        human_cons = analyze_pool(human, kept, key, "human")
+        win_rates(human, kept, key, "human")
+    if llm:
+        kept = sanity_keep(llm, key, sanity_ids, args.sanity_threshold, "llm")
+        llm_cons = analyze_pool(llm, kept, key, "llm")
+        win_rates(llm, kept, key, "llm")
+
+    if human_cons and llm_cons:
+        cross_consensus(llm_cons, "llm", human_cons, "human")
 
 
 if __name__ == "__main__":

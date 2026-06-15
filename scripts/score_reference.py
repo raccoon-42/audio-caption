@@ -1,18 +1,22 @@
-"""Score BLAP predictions and run the MusicCaps-leakage split (main env).
+"""Score a reference captioner's predictions and run the MusicCaps-leakage split
+(main env). Model-agnostic: works for any predictions file in the evaluate.py
+schema (BLAP, LP-MusicCaps transfer, etc.) -- only blap_generate.py is BLAP-specific.
 
-Two things:
+Three things:
 1. Overall metrics via evaluate.compute_metrics (same 10 metrics + FENSE as every
    reference row), written to the path reference_comparison.py expects
-   (results/reference/<name>/<name>_metrics_<name>.json) so BLAP drops into the
-   table like the other rows.
+   (results/reference/<name>/<name>_metrics_<name>.json) so the model drops into
+   the table like the other rows.
 2. A leakage split: the seed-42 test set is divided by is_audioset_eval into the
    in-MusicCaps-train subset (==0) and the held-out subset (==1). A checkpoint
    fine-tuned on the MusicCaps official-train half inflates scores on the ==0
    subset of this random split; a clean model scores evenly across both. The
-   CIDEr-D in/out ratio is the verdict (same signature that exposed LP transfer).
+   CIDEr-D in/out ratio is the verdict.
+3. With --held-out-name, also writes the held-out subset (==1) -- the leakage-free
+   clean number -- as its own reference row.
 
-Works for any predictions file that carries is_audioset_eval (e.g. a leaky
-LP-MusicCaps transfer rerun), not just BLAP.
+Predictions must carry is_audioset_eval for steps 2-3 (carry it through at
+generation, or join it on by reference text from results/test_split.json).
 """
 import argparse
 import json
@@ -29,29 +33,16 @@ def _metrics(items):
                            [p["hypothesis"] for p in items])
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--pred",
-                    default="results/reference/blap/predictions/blap_predictions_blap.json")
-    ap.add_argument("--name", default="blap")
-    ap.add_argument("--out", default=None,
-                    help="Defaults to results/reference/<name>/<name>_metrics_<name>.json")
-    args = ap.parse_args()
-
-    pred = json.loads(Path(args.pred).read_text())
-    items = pred["predictions"]
-    print(f"Scoring {len(items)} predictions ({pred.get('framework')}) ...")
-    metrics = _metrics(items)
-    for k, v in metrics.items():
-        print(f"  {k}: {v:.4f}")
-
-    out = Path(args.out) if args.out else (
-        Path("results/reference") / args.name / f"{args.name}_metrics_{args.name}.json")
+def _write_ref(name, pred, items, metrics, out=None):
+    """Write a reference-schema metrics file at the path reference_comparison.py
+    expects: results/reference/<name>/<name>_metrics_<name>.json."""
+    out = Path(out) if out else (
+        Path("results/reference") / name / f"{name}_metrics_{name}.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({
-        "model": pred.get("model", args.name),
+        "model": pred.get("model", name),
         "stage": "reference",
-        "framework": pred.get("framework", args.name),
+        "framework": pred.get("framework", name),
         "num_samples": len(items),
         "num_failed": pred.get("num_failed", 0),
         "gen_kwargs": pred.get("gen_kwargs", {}),
@@ -59,6 +50,47 @@ def main():
         "predictions": items,
     }, indent=2))
     print(f"Saved -> {out}")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--pred",
+                    default="results/reference/blap/predictions/blap_predictions_blap.json")
+    ap.add_argument("--name", default="blap")
+    ap.add_argument("--out", default=None,
+                    help="Defaults to results/reference/<name>/<name>_metrics_<name>.json")
+    ap.add_argument("--held-out-name", default=None,
+                    help="If set, also write the held-out subset (is_audioset_eval==1, "
+                         "the leakage-free clean number) as a reference row under this "
+                         "name, e.g. blap_clean.")
+    ap.add_argument("--manifest", default="results/test_split.json",
+                    help="Used to backfill is_audioset_eval by reference text when the "
+                         "predictions file lacks it (older generators).")
+    args = ap.parse_args()
+
+    pred = json.loads(Path(args.pred).read_text())
+    items = pred["predictions"]
+
+    # Backfill the leakage tag for older predictions (reference/hypothesis only) by
+    # joining on reference caption text (unique per clip); a no-op if already tagged.
+    if any(p.get("is_audioset_eval") is None for p in items):
+        manifest = Path(args.manifest)
+        if manifest.exists():
+            tag = {r["caption"]: r["is_audioset_eval"] for r in json.loads(manifest.read_text())}
+            filled = 0
+            for p in items:
+                if p.get("is_audioset_eval") is None and p["reference"] in tag:
+                    p["is_audioset_eval"] = tag[p["reference"]]
+                    filled += 1
+            if filled:
+                print(f"Backfilled is_audioset_eval for {filled} predictions from {manifest}")
+
+    print(f"Scoring {len(items)} predictions ({pred.get('framework')}) ...")
+    metrics = _metrics(items)
+    for k, v in metrics.items():
+        print(f"  {k}: {v:.4f}")
+
+    _write_ref(args.name, pred, items, metrics, args.out)
 
     # --- leakage split -------------------------------------------------------
     in_train = [p for p in items if p.get("is_audioset_eval") in (0, 0.0)]
@@ -89,6 +121,13 @@ def main():
         verdict = ("CLEAN -> even across subsets, consistent with the "
                    "ShutterStock-only checkpoint; no dagger (leaks=False)")
     print(f"\nVerdict: CIDEr-D in/out ratio = {ratio:.2f} -> {verdict}")
+
+    if args.held_out_name:
+        # The held-out subset (never in any MusicCaps finetune) is the leakage-free
+        # reportable score regardless of whether the released ckpt leaks.
+        print(f"\nWriting held-out clean row '{args.held_out_name}' "
+              f"(n={len(held_out)}):")
+        _write_ref(args.held_out_name, pred, held_out, m_out)
 
 
 if __name__ == "__main__":

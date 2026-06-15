@@ -85,9 +85,10 @@ unbounded metrics so a memorizing row's CIDEr-D/SPIDEr can't crush the scale). M
 rows' status is known from documentation (LP-MusicCaps pretrain is clean, transfer is
 leaky). Where it is ambiguous — BLAP's single released checkpoint could be the clean
 ShutterStock base or the MusicCaps-finetuned variant — it is decided **empirically**:
-`blap_score.py` splits the test set by `is_audioset_eval` (the MusicCaps official
+`score_reference.py` splits the test set by `is_audioset_eval` (the MusicCaps official
 train/eval label) and flags leakage if scores spike on the clips a finetuned model
-would have seen; if leaky, the clean held-out subset is the reportable number.
+would have seen; if leaky, the clean held-out subset is the reportable number
+(`--held-out-name` writes it as its own row -- used for both BLAP and LP-MusicCaps transfer).
 
 Decoding is kept close to the pipeline (greedy, no repetition penalty) so the
 comparison is fair; `max_new_tokens` is higher (128) to fit the captioners' natural
@@ -211,20 +212,20 @@ uv run python scripts/dump_test_split.py
 
 # LP-MusicCaps in its torch-1.13 CPU venv, then score in the main env
 ~/dev/lp-music-caps/.venv/bin/python scripts/lp_musiccaps_generate.py            # pretrain (clean)
-uv run python scripts/lp_musiccaps_score.py
+uv run python scripts/score_reference.py --pred results/reference/lp_music_caps/predictions/lp_music_caps_predictions_pretrain.json --name lp_music_caps
 ~/dev/lp-music-caps/.venv/bin/python scripts/lp_musiccaps_generate.py \
     --exp-dir ~/dev/lp-music-caps/lpmc/music_captioning/exp/transfer/lp_music_caps \
     --framework transfer \
     --out results/reference/lp_music_caps_transfer/predictions/lp_music_caps_transfer_predictions_transfer.json
-uv run python scripts/lp_musiccaps_score.py \
+uv run python scripts/score_reference.py \
     --pred results/reference/lp_music_caps_transfer/predictions/lp_music_caps_transfer_predictions_transfer.json \
-    --name lp_music_caps_transfer
+    --name lp_music_caps_transfer --held-out-name lp_music_caps_transfer_clean   # leaky; clean held-out row
 
 # BLAP: stage the offline bundle on a networked machine, copy via USB, run on the GPU box
 ./scripts/blap_fetch.sh                       # -> blap_bundle/ (download steps + venv setup printed)
 .venv-blap/bin/python scripts/blap_generate.py \
     --ckpt blap_bundle/model/checkpoint.ckpt --model-config blap_bundle/model/config.json
-uv run python scripts/blap_score.py           # overall metrics + is_audioset_eval leakage verdict
+uv run python scripts/score_reference.py      # overall metrics + is_audioset_eval leakage verdict
 ```
 
 ## Pipeline Steps
@@ -244,8 +245,9 @@ uv run python scripts/blap_score.py           # overall metrics + is_audioset_ev
 | Reference captioner | `scripts/eval_reference_captioner.py` | Generate + score a zero-shot audio-LM (`--model-id`, `--backend`); reuses `compute_metrics` |
 | Captioner smoke tests | `scripts/try_audio_flamingo.py`, `scripts/try_qwen_audio.py` | Print REF vs HYP for a few clips before a full run |
 | Test-split manifest | `scripts/dump_test_split.py` | Dumps the shared seed-42 test split (`results/test_split.json`, with `is_audioset_eval`) for the separate-venv captioners |
-| LP-MusicCaps | `scripts/lp_musiccaps_generate.py`, `scripts/lp_musiccaps_score.py` | Generate (torch-1.13 CPU venv) + score; `--framework transfer` for the leaky variant |
-| BLAP | `scripts/blap_fetch.sh`, `scripts/blap_generate.py`, `scripts/blap_score.py` | Offline-stage (Mac), generate (cu128 GPU venv), score + `is_audioset_eval` leakage split |
+| LP-MusicCaps | `scripts/lp_musiccaps_generate.py`, `scripts/score_reference.py` | Generate (torch-1.13 CPU venv) + score; `--framework transfer` for the leaky variant |
+| BLAP | `scripts/blap_fetch.sh`, `scripts/blap_generate.py`, `scripts/score_reference.py` | Offline-stage (Mac), generate (cu128 GPU venv), score + `is_audioset_eval` leakage split |
+| Reference scoring | `scripts/score_reference.py` | Model-agnostic: metrics + `is_audioset_eval` leakage split + `--held-out-name` clean row, for any reference predictions file |
 | Report artifacts | `scripts/reporting/*.py` | LaTeX table fragments and figures generated from `results/` |
 
 ## Ablations
@@ -298,10 +300,9 @@ scripts/
   try_qwen_audio.py        Qwen2-Audio smoke test
   dump_test_split.py       Shared seed-42 test-split manifest (+ is_audioset_eval)
   lp_musiccaps_generate.py LP-MusicCaps generate (separate torch-1.13 CPU venv)
-  lp_musiccaps_score.py    LP-MusicCaps score (reuses compute_metrics)
   blap_fetch.sh            Stage the BLAP offline bundle (download on a networked box)
   blap_generate.py         BLAP generate (separate torch-cu128 GPU venv)
-  blap_score.py            BLAP score + is_audioset_eval leakage split
+  score_reference.py       Reference score (any model): metrics + is_audioset_eval leakage split + held-out clean row
   dataset.py               Dataloader with embedding caching
   projection.py            Shared MLP projection module (input dim auto-derived)
   trainer.py               Shared training loop + early stopping
