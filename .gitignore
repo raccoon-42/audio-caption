@@ -35,3 +35,6 @@ blap_bundle.tar
 
 # local secrets (API keys)
 .env
+
+# raw human-eval export carries rater names + user-agent; commit the anonymized copy only
+pairwise_eval/human_responses.csv
