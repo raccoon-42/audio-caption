@@ -380,8 +380,8 @@ def run_judge(name, spec, condition, pairs, key, references, audio_dir,
 def main():
     load_dotenv()
     ap = argparse.ArgumentParser()
-    ap.add_argument("--site-dir", default="human_eval/site")
-    ap.add_argument("--key", default="human_eval/key.json")
+    ap.add_argument("--site-dir", default="pairwise_eval/site")
+    ap.add_argument("--key", default="pairwise_eval/key.json")
     ap.add_argument("--out-dir", default="results/llm_judge")
     ap.add_argument("--pred-files", nargs="+", default=[
         "results/gpt2/ablations/decoding/gpt2_ablation_trim_ngram2.json",

@@ -1,11 +1,11 @@
 // Google Apps Script web app: receives a submission from the eval site and
 // appends one row per pair-response to the bound Google Sheet.
 //
-// Setup (see human_eval/README.md):
+// Setup (see pairwise_eval/README.md):
 //   1. Create a Google Sheet, Extensions > Apps Script, paste this in.
 //   2. Deploy > New deployment > Web app.
 //        Execute as: Me.   Who has access: Anyone.
-//   3. Copy the Web app URL into human_eval/site/config.js (EVAL_ENDPOINT).
+//   3. Copy the Web app URL into pairwise_eval/site/config.js (EVAL_ENDPOINT).
 
 var HEADERS = [
   "received_at", "rater", "pair_id", "q1", "q2",

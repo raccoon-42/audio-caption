@@ -318,10 +318,17 @@ scripts/
     figures.py                 Result figures (vector PDF)
     reference_comparison.py    Pipeline vs zero-shot captioner figure + table
     vocal_bias.py              Vocalist-bias statistics + tables
+    poster_fense.py            Poster FENSE bar chart (big fonts, ClapCap highlighted)
+    eval_panel.py              Poster A/B win-rate bars + Fleiss kappa (reads pairwise_eval judge JSONs)
+pairwise_eval/           Pairwise A/B study + LLM-judge panel (see pairwise_eval/README.md)
+  llm_judge.py          LLM-as-judge panel over the same pairs (audio + text conditions)
+  compute_kappa.py      Fleiss/Cohen kappa + win-rates + sanity filter + llm-vs-human consensus
 data/                 Dataset and cached embeddings
   embeddings/         Precomputed per-encoder embedding tensors
 checkpoints/          Model checkpoints (per tag; encoder swaps under encoder_swap/)
 reports/              LaTeX sources; generated tables/ and figures/
+  416A.tex            CENG416 report
+  poster/             CENG416 A0 poster (clapcap_poster.tex)
 results/              Structured results (per model / per encoder):
   lr_search/            Optuna DBs, LR search JSONs, S1 projection .pt
   training/             Per-stage training history JSONs
@@ -329,6 +336,7 @@ results/              Structured results (per model / per encoder):
   ablations/arch/       Arch ablation result JSONs
   ablations/decoding/   Decoding ablation result JSONs
   reference/<name>/     Zero-shot captioner predictions + metrics JSONs
+  llm_judge/{audio,text}/ LLM-judge panel result JSONs (pairwise_eval)
 ```
 
 ## Reproducibility

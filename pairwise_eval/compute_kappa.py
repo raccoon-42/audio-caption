@@ -236,7 +236,7 @@ def main():
     ap.add_argument("--csv", help="human Sheet export")
     ap.add_argument("--json-dir", help="dir of human results_*.json")
     ap.add_argument("--llm-dir", help="dir of LLM-judge JSON (one condition)")
-    ap.add_argument("--key", default="human_eval/key.json")
+    ap.add_argument("--key", default="pairwise_eval/key.json")
     ap.add_argument("--sanity-threshold", type=float, default=0.75)
     args = ap.parse_args()
 

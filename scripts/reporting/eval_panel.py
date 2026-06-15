@@ -3,7 +3,7 @@
 comparison and judge panel, with each panel's Fleiss' kappa annotated.
 
 Reads the LLM-judge pools (results/llm_judge/{audio,text}) and, if present, a
-human pool (--human-csv / --human-json-dir), reusing human_eval/compute_kappa.py
+human pool (--human-csv / --human-json-dir), reusing pairwise_eval/compute_kappa.py
 so the numbers match the analysis script exactly. One stacked bar per
 (comparison, pool): share of votes to GPT-2 / its opponent / tie, on Q1
 (accuracy). The message: GPT-2-best is preferred over T5-best by every panel,
@@ -21,7 +21,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "human_eval"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "pairwise_eval"))
 import json
 from compute_kappa import CATS, fleiss_kappa, load_pool  # noqa: E402
 
@@ -35,7 +35,7 @@ plt.rcParams.update({
     "pdf.fonttype": 42,
 })
 
-KEY = Path("human_eval/key.json")
+KEY = Path("pairwise_eval/key.json")
 LLM = Path("results/llm_judge")
 FIG_OUT = Path("reports/figures")
 

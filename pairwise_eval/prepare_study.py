@@ -72,8 +72,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir", default="data/dataset")
     ap.add_argument("--segments", default="data/segments")
-    ap.add_argument("--out", default="human_eval/site")
-    ap.add_argument("--key", default="human_eval/key.json")
+    ap.add_argument("--out", default="pairwise_eval/site")
+    ap.add_argument("--key", default="pairwise_eval/key.json")
     ap.add_argument("--data-seed", type=int, default=42,
                     help="must match the seed used to generate predictions")
     ap.add_argument("--select-seed", type=int, default=123,

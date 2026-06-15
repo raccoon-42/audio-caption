@@ -1,8 +1,11 @@
-# Human evaluation (pairwise A-vs-B)
+# Pairwise evaluation (human raters + LLM judges)
 
-Pairwise human study for the music-captioning thesis. Raters hear a 10s clip
-and pick the better of two blinded captions on two axes (more accurate / less
-wrong). Produces inter-rater Fleiss' kappa plus win-rates.
+Pairwise A-vs-B evaluation for the music-captioning thesis. Each rater hears a
+10s clip and picks the better of two blinded captions on two axes (more accurate
+/ less wrong). The **same study** is run by two independent rater pools: human
+raters (this directory's static site) and an LLM-judge panel (`llm_judge.py`).
+`compute_kappa.py` ingests either pool and reports inter-rater Fleiss' kappa,
+win-rates, and llm-vs-human consensus.
 
 ## Design
 
@@ -21,11 +24,11 @@ wrong). Produces inter-rater Fleiss' kappa plus win-rates.
 ## 1. Build the study
 
 ```
-uv run python human_eval/prepare_study.py
+uv run python pairwise_eval/prepare_study.py
 ```
 
 Writes `site/data/pairs.json` (rater-facing, blinded), `site/audio/clip_*.mp3`
-(transcoded), and `human_eval/key.json` (private system mapping; **never
+(transcoded), and `pairwise_eval/key.json` (private system mapping; **never
 published**). Pair ids are opaque (`p00`..`p15`) so the page does not reveal
 which pairs are sanity checks. Defaults pick the top-FENSE decoding config per
 model; override with `--pred-best` / `--pred-t5` / `--n-*` if needed.
@@ -33,7 +36,7 @@ model; override with `--pred-best` / `--pred-t5` / `--n-*` if needed.
 ## 2. Collect responses (Apps Script + Google Sheet)
 
 1. Create a Google Sheet. **Extensions > Apps Script**, paste
-   `human_eval/apps_script.gs`, save.
+   `pairwise_eval/apps_script.gs`, save.
 2. **Deploy > New deployment > Web app**. Execute as: *Me*. Who has access:
    *Anyone*. Copy the Web app URL.
 3. Paste that URL into `site/config.js` (`window.EVAL_ENDPOINT`).
@@ -44,11 +47,11 @@ a `results_<rater>.json` as a fallback in case a POST fails.
 ## 3. Publish the site (GitHub Pages)
 
 The site is fully static. Easiest path that keeps `key.json` private: publish a
-**separate repo** containing only the contents of `human_eval/site/`.
+**separate repo** containing only the contents of `pairwise_eval/site/`.
 
 ```
 # from a fresh clone of a new public repo
-cp -r /path/to/audio-caption/human_eval/site/* .
+cp -r /path/to/audio-caption/pairwise_eval/site/* .
 git add . && git commit -m "music caption eval" && git push
 ```
 
@@ -64,9 +67,9 @@ Export the Sheet to CSV (File > Download > CSV) and/or collect the fallback
 JSON files into a folder, then:
 
 ```
-uv run python human_eval/compute_kappa.py --csv responses.csv
+uv run python pairwise_eval/compute_kappa.py --csv responses.csv
 # or
-uv run python human_eval/compute_kappa.py --json-dir human_eval/responses
+uv run python pairwise_eval/compute_kappa.py --json-dir pairwise_eval/responses
 ```
 
 Reports: per-rater sanity accuracy (raters below 0.75 are dropped), Fleiss'
@@ -78,11 +81,11 @@ and reports llm-vs-human agreement. One condition per `--llm-dir`:
 
 ```
 # llm-llm only (no human data needed)
-uv run python human_eval/compute_kappa.py --llm-dir results/llm_judge/audio
-uv run python human_eval/compute_kappa.py --llm-dir results/llm_judge/text
+uv run python pairwise_eval/compute_kappa.py --llm-dir results/llm_judge/audio
+uv run python pairwise_eval/compute_kappa.py --llm-dir results/llm_judge/text
 
 # all three: human-human + llm-llm + llm-vs-human consensus
-uv run python human_eval/compute_kappa.py --csv responses.csv \
+uv run python pairwise_eval/compute_kappa.py --csv responses.csv \
     --llm-dir results/llm_judge/audio
 ```
 
