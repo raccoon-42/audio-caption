@@ -166,6 +166,10 @@ uv run python scripts/evaluate.py --stage 2 --model gpt2 --ckpt-tag gpt2_seed44
 > T5 x3 seeds), and each model is judged against its own floor (it does not transfer
 > across architectures — T5 is ~2.5x noisier than GPT-2).
 
+Where the selected LR sits in the Optuna search (stage-1 1-D sweep, stage-2 projection × LM grid):
+
+![LR search — language models](reports/figures/fig_lr_search.png)
+
 ### 3b. Audio-encoder ablation (GPT-2 fixed)
 
 ```bash
@@ -184,6 +188,10 @@ uv run python scripts/precompute_embeddings.py --encoder musicfm --musicfm-repo 
 
 Stage-2 can be run later from the saved `stage1_best.pt`:
 `train_gpt2.py --stage 2 --config configs/gpt2_<encoder>.yaml`.
+
+Per-encoder stage-1 LR search, with the selected LR starred:
+
+![LR search — encoders](reports/figures/fig_lr_search_encoders.png)
 
 ### 3c. Reference captioners (zero-shot, separate comparison)
 
@@ -278,6 +286,8 @@ uv run python scripts/score_reference.py      # overall metrics + is_audioset_ev
 
 **Audio encoder** (GPT-2 fixed, stage-1 reported):
 - General CLAP (baseline) vs music-CLAP, MERT, MusicFM, MuQ / MuQ-MuLan
+
+![Encoder ablation vs noise floor](reports/figures/fig_encoder_noisefloor.png)
 
 ## Metrics
 
