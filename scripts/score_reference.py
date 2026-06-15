@@ -20,12 +20,24 @@ generation, or join it on by reference text from results/test_split.json).
 """
 import argparse
 import json
+import re
 from pathlib import Path
 
 from evaluate import compute_metrics
 
 WATCH = ["CIDEr-D", "SPIDEr", "FENSE", "SBERT-sim"]  # leakage-sensitive metrics
 LEAK_RATIO = 1.5  # CIDEr-D in/out above this flags train-on-test
+
+_SENT_END = re.compile(r"[.!?](?=[\"')\]\s]|$)")
+
+
+def trim_to_last_sentence(text):
+    """Cut a caption at its last sentence-terminating mark so a hypothesis that hit
+    the generator's token cap mid-sentence is not penalised by FENSE's incomplete-
+    sentence fluency detector. Returns the text unchanged when no terminator is
+    present (a single unfinished fragment -- nothing safe to trim to)."""
+    ends = [m.end() for m in _SENT_END.finditer(text)]
+    return text[:ends[-1]].strip() if ends else text.strip()
 
 
 def _metrics(items):
@@ -66,10 +78,24 @@ def main():
     ap.add_argument("--manifest", default="results/test_split.json",
                     help="Used to backfill is_audioset_eval by reference text when the "
                          "predictions file lacks it (older generators).")
+    ap.add_argument("--trim-sentences", action="store_true",
+                    help="Trim each hypothesis to its last complete sentence before "
+                         "scoring, so captions truncated mid-sentence by the generator's "
+                         "token cap are not penalised by FENSE's incomplete-sentence "
+                         "fluency detector.")
     args = ap.parse_args()
 
     pred = json.loads(Path(args.pred).read_text())
     items = pred["predictions"]
+
+    if args.trim_sentences:
+        n_trim = 0
+        for p in items:
+            trimmed = trim_to_last_sentence(p["hypothesis"])
+            if trimmed != p["hypothesis"]:
+                p["hypothesis"] = trimmed
+                n_trim += 1
+        print(f"Trimmed {n_trim}/{len(items)} hypotheses to last complete sentence.")
 
     # Backfill the leakage tag for older predictions (reference/hypothesis only) by
     # joining on reference caption text (unique per clip); a no-op if already tagged.

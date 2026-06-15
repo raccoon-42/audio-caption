@@ -79,24 +79,25 @@ networked machine, transfer `blap_bundle/` via USB — see `scripts/blap_fetch.s
 All of them read the shared split dumped by `scripts/dump_test_split.py`.
 
 **Leakage handling.** References trained on MusicCaps may have seen test clips, so they
-carry a dagger (†) in the table, are treated as **reference upper bounds**, and are
-never bolded as winners (bold marks the best *non-leaked* row; the figure also caps
-unbounded metrics so a memorizing row's CIDEr-D/SPIDEr can't crush the scale). Most
-rows' status is known from documentation (LP-MusicCaps pretrain is clean, transfer is
-leaky). Where it is ambiguous — BLAP's single released checkpoint could be the clean
-ShutterStock base or the MusicCaps-finetuned variant — it is decided **empirically**:
-`score_reference.py` splits the test set by `is_audioset_eval` (the MusicCaps official
-train/eval label) and flags leakage if scores spike on the clips a finetuned model
-would have seen; if leaky, the clean held-out subset is the reportable number
-(`--held-out-name` writes it as its own row -- used for both BLAP and LP-MusicCaps transfer).
+carry a dagger (†), are treated as **reference upper bounds**, and are never bolded as
+winners (bold marks the best *non-leaked* row). Status is taken from documentation where
+known (LP-MusicCaps pretrain clean, transfer leaky); where ambiguous (BLAP's single
+checkpoint), `score_reference.py` decides it empirically by splitting the test set on
+`is_audioset_eval` and flagging score spikes on clips a finetuned model would have seen.
+For leaky rows, the clean held-out subset is the reportable number (`--held-out-name`).
 
-Decoding is kept close to the pipeline (greedy, no repetition penalty) so the
-comparison is fair; `max_new_tokens` is higher (128) to fit the captioners' natural
-output length. The Qwen3-Omni captioner is **prompt-less and long-form** (it ignores
-text prompts), so it is generated then **sentence-aware trimmed to ~50 words**
-(`--trim-words`, the MusicCaps reference length) at scoring time — a normalization
-applied to that row only. **FENSE** is the fair comparator throughout, since verbose
-output penalizes lexical n-gram metrics on a style mismatch.
+Decoding stays close to the pipeline (greedy, no repetition penalty) for fairness, with
+`max_new_tokens=128` to fit the captioners' longer output. The prompt-less, long-form
+Qwen3-Omni captioner is sentence-trimmed to ~50 words (`--trim-words`) at scoring time.
+**FENSE** is the primary comparator, since verbose output unfairly penalizes n-gram metrics.
+
+Sentence-trimming to the last complete sentence is standard post-processing for the
+pipeline (ClapCap) models too — their reported configs are the `*trim*` predictions, and
+`score_reference.py --trim-sentences` applies the same trim to references, keeping the
+comparison apples-to-apples. The effect is asymmetric: it lifts the pipeline models'
+FENSE substantially (their short captions sit in FENSE's fluency detector's trained
+regime, so a mid-sentence cutoff fires the incomplete-sentence penalty) but barely moves
+the long-form references (< 0.004), whose verbose output is out of that regime.
 
 ## Reproducing Results
 
@@ -279,73 +280,30 @@ SPICE and CIDEr-D are Java-backed (JDK 11 required, see Prerequisites). FENSE is
 
 ## Project Structure
 
+Per-script descriptions are in the Pipeline Steps table above; this is the layout only.
+
 ```
-configs/              Per-model + per-encoder YAML configs (hyperparams, paths)
-  gpt2.yaml           Baseline CLAP language-model configs
-  t5.yaml
-  gpt2_<encoder>.yaml Encoder-swap configs (GPT-2 fixed, one per encoder)
-  opt.yaml            Retained, out of current scope
-  llama.yaml
-scripts/
-  train_gpt2.py       Self-contained training scripts (one per model)
-  train_t5.py
-  train_opt.py        Retained, out of current scope
-  train_llama.py
-  lr_search.py             Optuna LR search (--config for encoder swaps)
-  evaluate.py              Shared evaluation (metrics + generation)
-  prepare_data.py          Data download and baseline CLAP precomputation
-  precompute_embeddings.py Encoder-swap embedding extraction (--encoder <name>)
-  eval_reference_captioner.py Zero-shot audio-LM generate + score (multi-backend)
-  try_audio_flamingo.py    Audio Flamingo smoke test
-  try_qwen_audio.py        Qwen2-Audio smoke test
-  dump_test_split.py       Shared seed-42 test-split manifest (+ is_audioset_eval)
-  lp_musiccaps_generate.py LP-MusicCaps generate (separate torch-1.13 CPU venv)
-  blap_fetch.sh            Stage the BLAP offline bundle (download on a networked box)
-  blap_generate.py         BLAP generate (separate torch-cu128 GPU venv)
-  score_reference.py       Reference score (any model): metrics + is_audioset_eval leakage split + held-out clean row
-  dataset.py               Dataloader with embedding caching
-  projection.py            Shared MLP projection module (input dim auto-derived)
-  trainer.py               Shared training loop + early stopping
-  utils.py                 Seed setting, depth-LR auto-loader
-  run_arch_ablations.sh      Train + eval arch ablations (6 configs/model)
-  run_decoding_ablations.sh  Eval-only decoding ablations (~23 configs/model)
-  run_lr_search_encoders.sh  LR search across all encoder configs
-  run_train_eval_encoders.sh Stage-1 train + eval per encoder
-  noise_floor.py             Compute noise floor stats from seed results
-  reporting/                 Report artifact generators (run from repo root)
-    thesis_tables.py           LaTeX table fragments for the thesis report
-    paper_tables.py            Lean table fragments for the two-column paper
-    figures.py                 Result figures (vector PDF)
-    reference_comparison.py    Pipeline vs zero-shot captioner figure + table
-    vocal_bias.py              Vocalist-bias statistics + tables
-    poster_fense.py            Poster FENSE bar chart (big fonts, ClapCap highlighted)
-    eval_panel.py              Poster A/B win-rate bars + Fleiss kappa (reads pairwise_eval judge JSONs)
-pairwise_eval/           Pairwise A/B study + LLM-judge panel (see pairwise_eval/README.md)
-  llm_judge.py          LLM-as-judge panel over the same pairs (audio + text conditions)
-  compute_kappa.py      Fleiss/Cohen kappa + win-rates + sanity filter + llm-vs-human consensus
-data/                 Dataset and cached embeddings
-  embeddings/         Precomputed per-encoder embedding tensors
-checkpoints/          Model checkpoints (per tag; encoder swaps under encoder_swap/)
-reports/              LaTeX sources; generated tables/ and figures/
-  416A.tex            CENG416 report
-  poster/             CENG416 A0 poster (clapcap_poster.tex)
-results/              Structured results (per model / per encoder):
-  lr_search/            Optuna DBs, LR search JSONs, S1 projection .pt
-  training/             Per-stage training history JSONs
-  predictions/          Cached generation outputs
-  ablations/arch/       Arch ablation result JSONs
-  ablations/decoding/   Decoding ablation result JSONs
-  reference/<name>/     Zero-shot captioner predictions + metrics JSONs
-  llm_judge/{audio,text}/ LLM-judge panel result JSONs (pairwise_eval)
+configs/      Per-model + per-encoder YAML (gpt2/t5 baseline, gpt2_<encoder> swaps;
+              opt/llama retained, out of scope)
+scripts/      Pipeline scripts (train_*, lr_search, evaluate, precompute_embeddings,
+              eval_reference_captioner, score_reference, run_*.sh, shared modules)
+  reporting/  LaTeX table + figure generators (run from repo root)
+pairwise_eval/ Pairwise A/B study + LLM-judge panel (see pairwise_eval/README.md)
+data/         Dataset and cached embeddings (embeddings/ per encoder)
+checkpoints/  Model checkpoints (encoder swaps under encoder_swap/)
+reports/      LaTeX sources (416A.tex, poster/); generated tables/ + figures/
+results/      Structured results: lr_search/ training/ predictions/ ablations/{arch,decoding}/
+              reference/<name>/ llm_judge/{audio,text}/
 ```
 
 ## Reproducibility
 
-- All experiments use `seed: 42` by default
-- **Two independent seeds** (the key mental model — same data throughout, only the training luck changes):
-  - **Split seed** — fixed at `cfg["seed"]` (42) for every run and every model. Controls *what data* the model sees (the train/val/test partition), so all runs evaluate on one identical ~550-clip test set and their scores are comparable.
-  - **Train seed** — set via `--seed N` (42/43/44...). Controls *the random luck of training* on that fixed data: weight initialization, batch shuffle order, and dropout masks. This is the only thing noise-floor runs vary, so they measure training variance, not data-partition variance.
-- Learning rates are tuned per model/encoder via Optuna (results cached, not re-run if found); noise-floor seeds reuse the tuned LR (no re-search)
+- **Two independent seeds:** the **split seed** is fixed at 42 for every run, so all
+  models evaluate on one identical ~550-clip test set; the **train seed** (`--seed N`)
+  varies only weight init, shuffle order, and dropout masks. Noise-floor runs vary the
+  train seed alone, measuring training variance rather than data-partition variance.
+- Learning rates are tuned per model/encoder via Optuna (cached, not re-run if found);
+  noise-floor seeds reuse the tuned LR
 - Pipeline scripts skip already-completed runs (checks for result JSON files)
 - Per-epoch loss history is saved in all result JSONs
 - Set `HF_HUB_OFFLINE=1` and `TRANSFORMERS_OFFLINE=1` if running without internet
