@@ -12,6 +12,11 @@ results/
 *.wav
 *.db
 
+# BLAP offline bundle + venv (weights transferred via USB, never committed)
+blap_bundle/
+blap_bundle.tar
+.venv-blap/
+
 # Notebook exports
 *.html
 
