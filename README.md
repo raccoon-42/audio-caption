@@ -10,6 +10,8 @@ The architecture is the audio analogue of ClipCap: a frozen audio encoder, a lea
 MLP projection to a prefix of pseudo-tokens, and a language-model decoder. Training is
 two-stage: (1) projection only (frozen LM), (2) projection + LM fine-tuning.
 
+![FENSE across models](reports/figures/fig_poster_fense.png)
+
 ## Language Models
 
 | Model | Type | Parameters |
@@ -97,6 +99,11 @@ comparison apples-to-apples. The effect is asymmetric: it lifts the pipeline mod
 FENSE substantially (their short captions sit in FENSE's fluency detector's trained
 regime, so a mid-sentence cutoff fires the incomplete-sentence penalty) but barely moves
 the long-form references (< 0.004), whose verbose output is out of that regime.
+
+Pipeline vs reference captioners, on the music-domain and general-audio subsets:
+
+![Reference comparison — music-domain captioners](reports/figures/fig_reference_comparison_music.png)
+![Reference comparison — general audio-LMs](reports/figures/fig_reference_comparison_general.png)
 
 ## Reproducing Results
 
@@ -257,6 +264,8 @@ uv run python scripts/score_reference.py      # overall metrics + is_audioset_ev
 - Dropout: 0.1, 0.3, 0.5
 - Projection depth: 1, 2, 3
 
+![Architectural ablation vs noise floor](reports/figures/fig_arch_noisefloor.png)
+
 **Decoding** (applied to baseline checkpoint, eval-only):
 - Repetition penalty
 - Beam search + length penalty
@@ -264,6 +273,8 @@ uv run python scripts/score_reference.py      # overall metrics + is_audioset_ev
 - Max new tokens
 - Nucleus sampling (top-p)
 - Sentence trimming (opt-in via `--trim-incomplete`)
+
+![Decoding ablation — FENSE and FER](reports/figures/fig_decoding_fense_fer.png)
 
 **Audio encoder** (GPT-2 fixed, stage-1 reported):
 - General CLAP (baseline) vs music-CLAP, MERT, MusicFM, MuQ / MuQ-MuLan
