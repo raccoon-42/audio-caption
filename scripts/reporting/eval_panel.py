@@ -51,10 +51,12 @@ C_GPT2, C_OPP, C_TIE = "#3182BD", "#C0392B", "#BDBDBD"
 # stacked bar. human = the listener panel (heard the clip); audio = judges that
 # heard the clip; text = judges given the human reference (caption-vs-caption only
 # -> gpt2_t5 alone). Humans come first so the LLM bars read as corroboration.
+# Grouped by COMPARISON (not by pool) so a presenter can point down each block:
+# "vs reference" -> humans then audio LLM agree; "vs T5" -> humans, audio, text agree.
 BARS = [
     ("ref_best", "human", "humans", "human reference"),
-    ("gpt2_t5", "human", "humans", "T5-best"),
     ("ref_best", "audio", "audio judges", "human reference"),
+    ("gpt2_t5", "human", "humans", "T5-best"),
     ("gpt2_t5", "audio", "audio judges", "T5-best"),
     ("gpt2_t5", "text", "text judges", "T5-best"),
 ]
