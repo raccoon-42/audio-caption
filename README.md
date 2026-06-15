@@ -46,10 +46,12 @@ differences.
 
 ## Reference Captioners
 
-Large zero-shot audio-LMs caption raw audio directly, bypassing the
+Off-the-shelf captioners that caption raw audio directly, bypassing the
 CLAP→projection→LM pipeline. They are scored on the **same test split and the same
 metrics** as a separate reference comparison (not as controlled ablation rows), to
-contextualize the lightweight pipeline against off-the-shelf models.
+contextualize the lightweight pipeline. Two groups.
+
+**General zero-shot audio-LMs** (large, not music-specialized):
 
 | Model | HF repo / slug | Backend | Input |
 |-------|----------------|---------|-------|
@@ -62,16 +64,38 @@ run locally, so the `dashscope` backend calls the DashScope OpenAI-compatible AP
 (`openai` SDK + base URL); set `DASHSCOPE_API_KEY` in `.env` (auto-loaded), and
 `DASHSCOPE_BASE_URL` only for non-Singapore regions.
 
+**Music-domain captioners** (trained specifically for music captioning):
+
+| Model | Source | Runner | Notes |
+|-------|--------|--------|-------|
+| LP-MusicCaps (pretrain) | `seungheondoh/lp-music-caps` `pretrain.pth` | `lp_musiccaps_generate.py` | BART-base; MSD pseudo-captions only → **leakage-free** |
+| LP-MusicCaps (transfer) | same repo, `transfer.pth` | `lp_musiccaps_generate.py --framework transfer` | fine-tuned on MusicCaps train → **leaky** domain ceiling |
+| BLAP | `Tino3141/blap` | `blap_generate.py` | BLIP-2 + Q-Former + Flan-T5-XL; leakage decided empirically |
+
+Each music-domain model pins an old torch incompatible with the RTX 5090, so it runs
+in its **own venv** (set up separately, kept outside this repo): LP-MusicCaps on a
+torch-1.13 CPU venv, BLAP on a torch-cu128 GPU venv staged offline (download on a
+networked machine, transfer `blap_bundle/` via USB — see `scripts/blap_fetch.sh`).
+All of them read the shared split dumped by `scripts/dump_test_split.py`.
+
+**Leakage handling.** References trained on MusicCaps may have seen test clips, so they
+carry a dagger (†) in the table, are treated as **reference upper bounds**, and are
+never bolded as winners (bold marks the best *non-leaked* row; the figure also caps
+unbounded metrics so a memorizing row's CIDEr-D/SPIDEr can't crush the scale). Most
+rows' status is known from documentation (LP-MusicCaps pretrain is clean, transfer is
+leaky). Where it is ambiguous — BLAP's single released checkpoint could be the clean
+ShutterStock base or the MusicCaps-finetuned variant — it is decided **empirically**:
+`blap_score.py` splits the test set by `is_audioset_eval` (the MusicCaps official
+train/eval label) and flags leakage if scores spike on the clips a finetuned model
+would have seen; if leaky, the clean held-out subset is the reportable number.
+
 Decoding is kept close to the pipeline (greedy, no repetition penalty) so the
 comparison is fair; `max_new_tokens` is higher (128) to fit the captioners' natural
 output length. The Qwen3-Omni captioner is **prompt-less and long-form** (it ignores
 text prompts), so it is generated then **sentence-aware trimmed to ~50 words**
 (`--trim-words`, the MusicCaps reference length) at scoring time — a normalization
-applied to that row only, since unlike the others it can't be prompted for brevity.
-Caveats reported alongside the numbers: these models may have seen MusicCaps in
-pre-training (treat as a **reference upper bound**, not a clean held-out score), and
-**FENSE** is the fair comparator since verbose output penalizes lexical n-gram metrics
-on a style mismatch.
+applied to that row only. **FENSE** is the fair comparator throughout, since verbose
+output penalizes lexical n-gram metrics on a style mismatch.
 
 ## Reproducing Results
 
@@ -176,6 +200,33 @@ uv run python scripts/eval_reference_captioner.py \
 uv run python scripts/reporting/reference_comparison.py
 ```
 
+### 3d. Music-domain captioners (separate venvs)
+
+These run in their own environments (old torch pins; see each script's docstring for
+the exact venv setup). All read the shared split from `dump_test_split.py`.
+
+```bash
+# Dump the shared test split once (carries is_audioset_eval for leakage splits)
+uv run python scripts/dump_test_split.py
+
+# LP-MusicCaps in its torch-1.13 CPU venv, then score in the main env
+~/dev/lp-music-caps/.venv/bin/python scripts/lp_musiccaps_generate.py            # pretrain (clean)
+uv run python scripts/lp_musiccaps_score.py
+~/dev/lp-music-caps/.venv/bin/python scripts/lp_musiccaps_generate.py \
+    --exp-dir ~/dev/lp-music-caps/lpmc/music_captioning/exp/transfer/lp_music_caps \
+    --framework transfer \
+    --out results/reference/lp_music_caps_transfer/predictions/lp_music_caps_transfer_predictions_transfer.json
+uv run python scripts/lp_musiccaps_score.py \
+    --pred results/reference/lp_music_caps_transfer/predictions/lp_music_caps_transfer_predictions_transfer.json \
+    --name lp_music_caps_transfer
+
+# BLAP: stage the offline bundle on a networked machine, copy via USB, run on the GPU box
+./scripts/blap_fetch.sh                       # -> blap_bundle/ (download steps + venv setup printed)
+.venv-blap/bin/python scripts/blap_generate.py \
+    --ckpt blap_bundle/model/checkpoint.ckpt --model-config blap_bundle/model/config.json
+uv run python scripts/blap_score.py           # overall metrics + is_audioset_eval leakage verdict
+```
+
 ## Pipeline Steps
 
 | Step | Script | Description |
@@ -192,6 +243,9 @@ uv run python scripts/reporting/reference_comparison.py
 | Encoder train+eval | `scripts/run_train_eval_encoders.sh` | Stage-1 train + eval per encoder (baseline eval-only) |
 | Reference captioner | `scripts/eval_reference_captioner.py` | Generate + score a zero-shot audio-LM (`--model-id`, `--backend`); reuses `compute_metrics` |
 | Captioner smoke tests | `scripts/try_audio_flamingo.py`, `scripts/try_qwen_audio.py` | Print REF vs HYP for a few clips before a full run |
+| Test-split manifest | `scripts/dump_test_split.py` | Dumps the shared seed-42 test split (`results/test_split.json`, with `is_audioset_eval`) for the separate-venv captioners |
+| LP-MusicCaps | `scripts/lp_musiccaps_generate.py`, `scripts/lp_musiccaps_score.py` | Generate (torch-1.13 CPU venv) + score; `--framework transfer` for the leaky variant |
+| BLAP | `scripts/blap_fetch.sh`, `scripts/blap_generate.py`, `scripts/blap_score.py` | Offline-stage (Mac), generate (cu128 GPU venv), score + `is_audioset_eval` leakage split |
 | Report artifacts | `scripts/reporting/*.py` | LaTeX table fragments and figures generated from `results/` |
 
 ## Ablations
@@ -242,6 +296,12 @@ scripts/
   eval_reference_captioner.py Zero-shot audio-LM generate + score (multi-backend)
   try_audio_flamingo.py    Audio Flamingo smoke test
   try_qwen_audio.py        Qwen2-Audio smoke test
+  dump_test_split.py       Shared seed-42 test-split manifest (+ is_audioset_eval)
+  lp_musiccaps_generate.py LP-MusicCaps generate (separate torch-1.13 CPU venv)
+  lp_musiccaps_score.py    LP-MusicCaps score (reuses compute_metrics)
+  blap_fetch.sh            Stage the BLAP offline bundle (download on a networked box)
+  blap_generate.py         BLAP generate (separate torch-cu128 GPU venv)
+  blap_score.py            BLAP score + is_audioset_eval leakage split
   dataset.py               Dataloader with embedding caching
   projection.py            Shared MLP projection module (input dim auto-derived)
   trainer.py               Shared training loop + early stopping
