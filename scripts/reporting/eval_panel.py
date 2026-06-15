@@ -203,8 +203,9 @@ def main():
     ax.grid(axis="x", alpha=0.3)
     out = FIG_OUT / "fig_eval_winrate.pdf"
     fig.savefig(out)
+    fig.savefig(out.with_suffix(".png"), dpi=200)
     plt.close(fig)
-    print(f"wrote {out}")
+    print(f"wrote {out} (+ .png)")
     for lab, sh, n in zip(labels, shares, ns):
         print(f"  {lab.replace(chr(10), ' ')}: "
               f"gpt2 {sh['gpt2']:.0%} / opp {sh['opp']:.0%} / tie {sh['tie']:.0%}  (n={n})")

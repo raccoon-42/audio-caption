@@ -299,9 +299,11 @@ def heatmap(human_cons, llm_dedup, llm_kept, key, out_path):
         fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="Cohen's kappa")
     fig.suptitle("Audio condition: rater x rater agreement", fontsize=11)
     fig.tight_layout()
-    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, bbox_inches="tight")
-    print(f"=== heatmap written to {out_path} ===\n")
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out, bbox_inches="tight")
+    fig.savefig(out.with_suffix(".png"), dpi=200, bbox_inches="tight")
+    print(f"=== heatmap written to {out} (+ .png) ===\n")
 
 
 def self_contrast(audio_dedup, audio_kept, text_dedup, text_kept, key):

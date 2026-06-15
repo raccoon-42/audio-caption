@@ -105,6 +105,29 @@ Pipeline vs reference captioners, on the music-domain and general-audio subsets:
 ![Reference comparison — music-domain captioners](reports/figures/fig_reference_comparison_music.png)
 ![Reference comparison — general audio-LMs](reports/figures/fig_reference_comparison_general.png)
 
+## Pairwise & LLM-judge Evaluation
+
+Beyond the metric tables, a blind **pairwise A/B study** (which caption is *more
+accurate* / *less wrong*?) judged the best ClapCap decoders against each other and
+against the human reference, across **three rater pools**: 10 human listeners, a
+3-model audio LLM panel that hears the clip, and a 5-model text LLM panel given the
+reference caption. Code, study site, and protocol live in
+[`pairwise_eval/`](pairwise_eval/README.md); `pairwise_eval/compute_kappa.py`
+produces every number below.
+
+Every pool prefers **GPT-2-best over T5-best**, and the **reference still wins** —
+the honest ceiling. Lay humans are noisy individually (Fleiss κ 0.13) but their
+*consensus* tracks the audio panel (human↔LLM Cohen κ 0.64, substantial).
+
+![Pairwise win-rates across human, audio-LLM, and text-LLM panels](reports/figures/fig_eval_winrate.png)
+
+Treating the human consensus as one rater against each audio judge shows **no
+human-vs-LLM split**: humans agree with `gpt_audio` and `qwen3_omni` more than
+`gemini-2.5-pro` agrees with the other LLMs — the dispersion is *within* the panel,
+with Gemini 2.5 Pro the dissenting judge.
+
+![Rater × rater Cohen κ, audio condition](reports/figures/fig_judge_heatmap.png)
+
 ## Reproducing Results
 
 ### Prerequisites
