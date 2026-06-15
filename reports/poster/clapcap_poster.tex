@@ -146,13 +146,14 @@ are leakage upper bounds, not clean held-out scores.
 %--------------------------------------------------------------- RESULTS 2
 \section*{Result 2 --- pairwise A/B evaluation}
 \Large
-A pairwise A/B study (more accurate? / less wrong?) judged by an LLM panel ---
-3 audio judges that hear the clip, 5 text judges given the human reference.
-Every panel \textbf{prefers GPT-2-best over T5-best}, corroborating that the
-cheaper decoder-only model is the stronger captioner; the \textbf{human
-reference still wins}, the honest ceiling. (Human raters: study live, data pending.)
+A pairwise A/B study (more accurate? / less wrong?) across \textbf{three rater
+pools} --- 10 human listeners, 3 audio LLM judges, 5 text LLM judges. Every pool
+\textbf{prefers GPT-2-best over T5-best}; the \textbf{reference still wins}, the
+honest ceiling. Lay humans are noisy individually (Fleiss $\kappa$ 0.13) but their
+\emph{consensus} tracks the audio panel (human$\leftrightarrow$LLM $\kappa = 0.64$).
+\vspace{0.5cm}
 \begin{center}
-\includegraphics[width=0.82\linewidth]{fig_eval_winrate.pdf}
+\includegraphics[width=\linewidth]{fig_eval_winrate.pdf}
 \end{center}
 
 %--------------------------------------------------------------- FINDINGS

@@ -21,6 +21,12 @@ where both pools are decisive.
 Categories are {A, B, tie}. Humans heard the clip, so the audio LLM panel is the
 natural comparator; run --llm-dir results/llm_judge/text separately for the
 text-only panel.
+
+Two extra analyses gate on flags:
+  --heatmap-out PATH  writes a per-question entity x entity Cohen-kappa heatmap
+    (one human-consensus 'rater' + each kept audio judge); needs --csv + --llm-dir.
+  --text-dir DIR  with --llm-dir (audio) computes each judge's audio-vs-text
+    grounding self-contrast (same model, two conditions; differing models flagged).
 """
 import argparse
 import csv
@@ -221,6 +227,124 @@ def cross_consensus(cons_a, label_a, cons_b, label_b):
     print()
 
 
+def base_judge(rater):
+    """Strip the '__audio'/'__text' condition suffix from a judge rater id."""
+    return rater.rsplit("__", 1)[0]
+
+
+def rater_labels(dedup, kept, key, q_idx):
+    """{rater: {pid: cat}} over kept raters, non-sanity pairs, CATS-only
+    (cant_tell / missing dropped). Used to build the judge-vs-judge matrix."""
+    out = defaultdict(dict)
+    for (rater, pid), ans in dedup.items():
+        if rater not in kept or pid not in key:
+            continue
+        if key[pid]["pair_type"] == "sanity":
+            continue
+        if ans[q_idx] in CATS:
+            out[rater][pid] = ans[q_idx]
+    return out
+
+
+def heatmap(human_cons, llm_dedup, llm_kept, key, out_path):
+    """Render a per-question entity x entity Cohen-kappa heatmap. Entities are
+    one human-consensus 'rater' (per-pair plurality of the kept humans) plus each
+    kept audio judge. Diagonal forced to 1.0; off-diagonal = Cohen's kappa over
+    pairs both label decisively."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    judges = sorted({base_judge(r) for r in llm_kept})
+    fig, axes = plt.subplots(1, len(QUESTIONS), figsize=(5.2 * len(QUESTIONS), 4.6))
+    for ax, (q_idx, q_name) in zip(np.atleast_1d(axes), QUESTIONS):
+        # Per-entity {pid: cat}: human consensus (drop undecided), then judges.
+        labels = {"human (consensus)":
+                  {p: c for p, c in human_cons.get(q_idx, {}).items() if c}}
+        jl = rater_labels(llm_dedup, llm_kept, key, q_idx)
+        per_judge = defaultdict(dict)
+        for rater, d in jl.items():
+            per_judge[base_judge(rater)].update(d)
+        for j in judges:
+            labels[j] = per_judge[j]
+        names = list(labels)
+        ticks = [{"gemini_2.5": "gemini-2.5-pro"}.get(nm, nm) for nm in names]
+        n = len(names)
+        mat = np.full((n, n), np.nan)
+        for i in range(n):
+            for k in range(n):
+                if i == k:
+                    mat[i, k] = 1.0
+                    continue
+                shared = sorted(set(labels[names[i]]) & set(labels[names[k]]))
+                if not shared:
+                    continue
+                a = [labels[names[i]][p] for p in shared]
+                b = [labels[names[k]][p] for p in shared]
+                ck = cohen_kappa(a, b)
+                if ck is not None:
+                    mat[i, k] = ck
+        im = ax.imshow(mat, cmap="RdYlGn", vmin=-0.3, vmax=1.0)
+        ax.set_xticks(range(n))
+        ax.set_yticks(range(n))
+        ax.set_xticklabels(ticks, rotation=40, ha="right", fontsize=8)
+        ax.set_yticklabels(ticks, fontsize=8)
+        ax.set_title(q_name, fontsize=10)
+        for i in range(n):
+            for k in range(n):
+                if not np.isnan(mat[i, k]):
+                    ax.text(k, i, f"{mat[i, k]:.2f}", ha="center", va="center",
+                            fontsize=8, color="black")
+        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="Cohen's kappa")
+    fig.suptitle("Audio condition: rater x rater agreement", fontsize=11)
+    fig.tight_layout()
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, bbox_inches="tight")
+    print(f"=== heatmap written to {out_path} ===\n")
+
+
+def self_contrast(audio_dedup, audio_kept, text_dedup, text_kept, key):
+    """Per-judge audio-vs-text grounding self-contrast: for judges present in
+    BOTH conditions (same model both times), Cohen's kappa + raw agreement on the
+    pairs each labels decisively in both. Judges that differ across conditions
+    (e.g. gpt_audio vs gpt_text) are not a true self-contrast -> flagged."""
+    print("=== audio-vs-text grounding self-contrast (per judge) ===")
+    a_by = defaultdict(set)
+    for r in audio_kept:
+        a_by[base_judge(r)].add(r)
+    t_by = defaultdict(set)
+    for r in text_kept:
+        t_by[base_judge(r)].add(r)
+    shared_judges = sorted(set(a_by) & set(t_by))
+    if not shared_judges:
+        print("  no judge present in both conditions\n")
+        return
+    for judge in shared_judges:
+        ar = next(iter(a_by[judge]))
+        tr = next(iter(t_by[judge]))
+        for q_idx, q_name in QUESTIONS:
+            al = {p: c for (rr, p), ans in audio_dedup.items()
+                  if rr == ar and p in key
+                  and key[p]["pair_type"] != "sanity"
+                  and (c := ans[q_idx]) in CATS}
+            tl = {p: c for (rr, p), ans in text_dedup.items()
+                  if rr == tr and p in key
+                  and key[p]["pair_type"] != "sanity"
+                  and (c := ans[q_idx]) in CATS}
+            shared = sorted(set(al) & set(tl))
+            if not shared:
+                print(f"  {judge} {q_name}: no shared decisive pairs")
+                continue
+            a = [al[p] for p in shared]
+            b = [tl[p] for p in shared]
+            ck = cohen_kappa(a, b)
+            raw = sum(1 for x, y in zip(a, b) if x == y) / len(shared)
+            print(f"  {judge} {q_name}: Cohen's kappa = {ck:.3f}, raw = {raw:.0%} "
+                  f"over {len(shared)} pairs")
+    print()
+
+
 def load_pool(csv_path, json_dir):
     raw = []
     if csv_path:
@@ -235,7 +359,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--csv", help="human Sheet export")
     ap.add_argument("--json-dir", help="dir of human results_*.json")
-    ap.add_argument("--llm-dir", help="dir of LLM-judge JSON (one condition)")
+    ap.add_argument("--llm-dir", help="dir of LLM-judge JSON (one condition; the "
+                    "audio panel when paired with --heatmap-out / --text-dir)")
+    ap.add_argument("--text-dir", help="dir of the TEXT-condition LLM-judge JSON; "
+                    "with --llm-dir (audio) triggers the audio-vs-text self-contrast")
+    ap.add_argument("--heatmap-out", help="write the human-consensus x audio-judge "
+                    "Cohen-kappa heatmap PDF here (needs --csv and --llm-dir audio)")
     ap.add_argument("--key", default="pairwise_eval/key.json")
     ap.add_argument("--sanity-threshold", type=float, default=0.75)
     args = ap.parse_args()
@@ -250,17 +379,30 @@ def main():
     llm = load_pool(None, args.llm_dir) if args.llm_dir else {}
 
     human_cons = llm_cons = None
+    llm_kept = set()
     if human:
         kept = sanity_keep(human, key, sanity_ids, args.sanity_threshold, "human")
         human_cons = analyze_pool(human, kept, key, "human")
         win_rates(human, kept, key, "human")
     if llm:
-        kept = sanity_keep(llm, key, sanity_ids, args.sanity_threshold, "llm")
-        llm_cons = analyze_pool(llm, kept, key, "llm")
-        win_rates(llm, kept, key, "llm")
+        llm_kept = sanity_keep(llm, key, sanity_ids, args.sanity_threshold, "llm")
+        llm_cons = analyze_pool(llm, llm_kept, key, "llm")
+        win_rates(llm, llm_kept, key, "llm")
 
     if human_cons and llm_cons:
         cross_consensus(llm_cons, "llm", human_cons, "human")
+
+    if args.heatmap_out:
+        if not (human_cons and llm):
+            raise SystemExit("--heatmap-out needs both --csv and --llm-dir")
+        heatmap(human_cons, llm, llm_kept, key, args.heatmap_out)
+
+    if args.text_dir:
+        if not llm:
+            raise SystemExit("--text-dir needs --llm-dir (the audio panel)")
+        text = load_pool(None, args.text_dir)
+        text_kept = sanity_keep(text, key, sanity_ids, args.sanity_threshold, "text")
+        self_contrast(llm, llm_kept, text, text_kept, key)
 
 
 if __name__ == "__main__":

@@ -22,8 +22,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "pairwise_eval"))
-import json
-from compute_kappa import CATS, fleiss_kappa, load_pool  # noqa: E402
+import argparse  # noqa: E402
+import json  # noqa: E402
+from compute_kappa import (  # noqa: E402
+    CATS, cohen_kappa, fleiss_kappa, load_pool, majority, sanity_keep,
+)
 
 plt.rcParams.update({
     "font.size": 18,
@@ -44,10 +47,13 @@ FIG_OUT = Path("reports/figures")
 # (gpt2_t5) into one slot -- each bar is labelled with who the opponent is.
 C_GPT2, C_OPP, C_TIE = "#3182BD", "#C0392B", "#BDBDBD"
 
-# (comparison pair_type, pool dir, pool label, opponent display name). Each is one
-# stacked bar. Audio = judges that heard the clip; text = judges given the human
-# reference as ground truth (caption-vs-caption only -> gpt2_t5 alone).
+# (comparison pair_type, pool key, pool label, opponent display name). Each is one
+# stacked bar. human = the listener panel (heard the clip); audio = judges that
+# heard the clip; text = judges given the human reference (caption-vs-caption only
+# -> gpt2_t5 alone). Humans come first so the LLM bars read as corroboration.
 BARS = [
+    ("ref_best", "human", "humans", "human reference"),
+    ("gpt2_t5", "human", "humans", "T5-best"),
     ("ref_best", "audio", "audio judges", "human reference"),
     ("gpt2_t5", "audio", "audio judges", "T5-best"),
     ("gpt2_t5", "text", "text judges", "T5-best"),
@@ -88,26 +94,73 @@ def panel_kappa(dedup, key, pair_types, q_idx=0):
     return k
 
 
+def consensus(dedup, key, q_idx=0):
+    """Per-pair plurality label over non-sanity pairs (undecided -> None)."""
+    item = defaultdict(list)
+    for (rater, pid), ans in dedup.items():
+        if pid not in key or key[pid]["pair_type"] == "sanity":
+            continue
+        if ans[q_idx] in CATS:
+            item[pid].append(ans[q_idx])
+    return {pid: majority(cats) for pid, cats in item.items()}
+
+
+def consensus_kappa(dedup_a, dedup_b, key, q_idx=0):
+    """Cohen's kappa between two pools' per-pair consensus labels."""
+    a, b = consensus(dedup_a, key, q_idx), consensus(dedup_b, key, q_idx)
+    pairs = [(a[p], b[p]) for p in set(a) & set(b)
+             if a[p] is not None and b[p] is not None]
+    if not pairs:
+        return None
+    return cohen_kappa([x for x, _ in pairs], [y for _, y in pairs])
+
+
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--human-csv", default="pairwise_eval/human_responses_anon.csv")
+    ap.add_argument("--human-json-dir")
+    ap.add_argument("--sanity-threshold", type=float, default=0.75)
+    args = ap.parse_args()
+
     FIG_OUT.mkdir(parents=True, exist_ok=True)
     key = {k["id"]: k for k in json.loads(KEY.read_text())}
+    sanity_ids = [i for i, k in key.items() if k["pair_type"] == "sanity"]
 
     pools = {d: load_pool(None, LLM / d) for d in ("audio", "text")}
-    kappa = {d: panel_kappa(pools[d], key,
-                            {"ref_best", "gpt2_t5"} if d == "audio" else {"gpt2_t5"})
-             for d in pools}
 
+    # Human listener pool: keep only sanity-passing raters before win-rates.
+    human = (load_pool(args.human_csv if Path(args.human_csv).exists() else None,
+                       args.human_json_dir)
+             if (args.human_json_dir or Path(args.human_csv).exists()) else {})
+    if human:
+        kept = sanity_keep(human, key, sanity_ids, args.sanity_threshold, "human")
+        human = {(r, p): v for (r, p), v in human.items() if r in kept}
+        pools["human"] = human
+
+    kappa = {d: panel_kappa(pools[d], key,
+                            {"gpt2_t5"} if d == "text" else {"ref_best", "gpt2_t5"})
+             for d in pools}
+    # Human consensus vs audio-LLM consensus agreement (Q1), the three-way number.
+    hl_kappa = consensus_kappa(human, pools["audio"], key) if human else None
+
+    # Compact right-side captions: short pool name + opponent.
+    short_pool = {"humans": "humans", "audio judges": "audio LLM",
+                  "text judges": "text LLM"}
+    short_opp = {"human reference": "reference", "T5-best": "T5"}
     labels, shares, ns = [], [], []
     for pair_type, pool, pool_label, opp in BARS:
+        if pool not in pools:
+            continue
         res = win_shares(pools[pool], key, pair_type)
         if res is None:
             continue
         sh, n = res
-        labels.append(f"GPT-2-best vs\n{opp}\n({pool_label})")
+        labels.append(f"{short_pool[pool_label]}\nGPT-2 vs {short_opp[opp]}")
         shares.append(sh)
         ns.append(n)
 
-    fig, ax = plt.subplots(figsize=(8.5, 4.6))
+    # Landscape strip, but tall enough that the five bars stay chunky/readable.
+    fig, ax = plt.subplots(figsize=(11.5, 5.9))
     y = range(len(labels))
     left = [0.0] * len(labels)
     segs = [("gpt2", C_GPT2, "GPT-2-best wins"),
@@ -116,28 +169,37 @@ def main():
     for kk, color, leg in segs:
         widths = [s[kk] for s in shares]
         ax.barh(list(y), widths, left=left, color=color, label=leg,
-                edgecolor="white", height=0.62)
+                edgecolor="white", height=0.74)
         for yi, (w, l) in enumerate(zip(widths, left)):
-            if w > 0.07:
+            if w > 0.06:
                 ax.text(l + w / 2, yi, f"{w*100:.0f}%", ha="center", va="center",
-                        color="white", fontweight="bold", fontsize=19)
+                        color="white", fontweight="bold", fontsize=24)
         left = [l + w for l, w in zip(left, widths)]
 
+    # Captions as a vertical list on the RIGHT; n= tucked into the left margin.
     ax.set_yticks(list(y))
-    ax.set_yticklabels(labels)
+    ax.set_yticklabels(labels, fontsize=19)
+    ax.yaxis.tick_right()
+    ax.tick_params(axis="y", length=0)
     ax.invert_yaxis()
     ax.set_xlim(0, 1)
-    ax.set_xlabel("share of judge votes  (Q1: which caption is more accurate)")
+    ax.set_xlabel("share of votes  (Q1: which caption is more accurate)", fontsize=20)
     ax.set_xticks([0, 0.25, 0.5, 0.75, 1.0])
-    ax.set_xticklabels(["0", "25%", "50%", "75%", "100%"])
-    # Per-bar n on the right edge; per-panel Fleiss kappa in the title.
+    ax.set_xticklabels(["0", "25%", "50%", "75%", "100%"], fontsize=17)
     for yi, n in enumerate(ns):
-        ax.text(1.005, yi, f"n={n}", va="center", ha="left", fontsize=13, color="#555")
-    ax.set_title("LLM-judge win-rates (Fleiss' "
-                 fr"$\kappa$: audio {kappa['audio']:.2f}, text {kappa['text']:.2f})",
-                 fontweight="bold")
-    ax.legend(loc="lower center", bbox_to_anchor=(0.5, -0.32),
-              ncol=3, frameon=False)
+        ax.text(-0.012, yi, f"n={n}", va="center", ha="right",
+                fontsize=15, color="#555")
+    kparts = []
+    if "human" in kappa:
+        kparts.append(fr"humans {kappa['human']:.2f}")
+    kparts += [fr"audio {kappa['audio']:.2f}", fr"text {kappa['text']:.2f}"]
+    title = r"Pairwise win-rates (Fleiss' $\kappa$: " + ", ".join(kparts) + ")"
+    if hl_kappa is not None:
+        title += ("\n" + fr"human$\leftrightarrow$audio-LLM consensus "
+                  fr"$\kappa$ = {hl_kappa:.2f} (substantial)")
+    ax.set_title(title, fontweight="bold", fontsize=21)
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, -0.30),
+              ncol=3, frameon=False, fontsize=19)
     ax.grid(axis="x", alpha=0.3)
     out = FIG_OUT / "fig_eval_winrate.pdf"
     fig.savefig(out)
