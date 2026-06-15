@@ -7,7 +7,7 @@ RUN WITH THE LP-MUSICCAPS VENV, not `uv run`:
 LP-MusicCaps pins torch==1.13.1 (CUDA 11.7), which cannot drive the RTX 5090
 (Blackwell), so this runs on CPU. It imports the `lpmc` package (installed
 editable in that venv) for the model + audio loader, reads the manifest written
-by lp_musiccaps_manifest.py, and writes predictions in evaluate.py's schema so
+by dump_test_split.py, and writes predictions in evaluate.py's schema so
 the main env can score them with evaluate.compute_metrics.
 
 Only the `pretrain` checkpoint is leakage-free (MSD pseudo-captions only, never
@@ -66,7 +66,7 @@ def load_model(exp_dir):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--manifest",
-                    default="results/reference/lp_music_caps/test_split.json")
+                    default="results/test_split.json")
     ap.add_argument("--exp-dir",
                     default=str(Path.home() / "dev/lp-music-caps/lpmc/music_captioning/exp/pretrain/lp_music_caps"),
                     help="Dir with hparams.yaml + last.pth for the chosen checkpoint.")
