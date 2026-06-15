@@ -72,11 +72,10 @@ run locally, so the `dashscope` backend calls the DashScope OpenAI-compatible AP
 | LP-MusicCaps (transfer) | same repo, `transfer.pth` | `lp_musiccaps_generate.py --framework transfer` | fine-tuned on MusicCaps train → **leaky** domain ceiling |
 | BLAP | `Tino3141/blap` | `blap_generate.py` | BLIP-2 + Q-Former + Flan-T5-XL; leakage decided empirically |
 
-Each music-domain model pins an old torch incompatible with the RTX 5090, so it runs
-in its **own venv** (set up separately, kept outside this repo): LP-MusicCaps on a
-torch-1.13 CPU venv, BLAP on a torch-cu128 GPU venv staged offline (download on a
-networked machine, transfer `blap_bundle/` via USB — see `scripts/blap_fetch.sh`).
-All of them read the shared split dumped by `scripts/dump_test_split.py`.
+Each music-domain model pins an older torch, so it runs in its **own venv** (set up
+separately, kept outside this repo): LP-MusicCaps on a torch-1.13 venv, BLAP on a
+torch-cu128 venv whose weights are fetched by `scripts/blap_fetch.sh`. All of them read
+the shared split dumped by `scripts/dump_test_split.py`.
 
 **Leakage handling.** References trained on MusicCaps may have seen test clips, so they
 carry a dagger (†), are treated as **reference upper bounds**, and are never bolded as
@@ -211,20 +210,20 @@ the exact venv setup). All read the shared split from `dump_test_split.py`.
 # Dump the shared test split once (carries is_audioset_eval for leakage splits)
 uv run python scripts/dump_test_split.py
 
-# LP-MusicCaps in its torch-1.13 CPU venv, then score in the main env
-~/dev/lp-music-caps/.venv/bin/python scripts/lp_musiccaps_generate.py            # pretrain (clean)
+# LP-MusicCaps: generate in its torch-1.13 venv ($LP_VENV), then score in the main env
+$LP_VENV/bin/python scripts/lp_musiccaps_generate.py                             # pretrain (clean)
 uv run python scripts/score_reference.py --pred results/reference/lp_music_caps/predictions/lp_music_caps_predictions_pretrain.json --name lp_music_caps
-~/dev/lp-music-caps/.venv/bin/python scripts/lp_musiccaps_generate.py \
-    --exp-dir ~/dev/lp-music-caps/lpmc/music_captioning/exp/transfer/lp_music_caps \
+$LP_VENV/bin/python scripts/lp_musiccaps_generate.py \
+    --exp-dir <lp-music-caps>/lpmc/music_captioning/exp/transfer/lp_music_caps \
     --framework transfer \
     --out results/reference/lp_music_caps_transfer/predictions/lp_music_caps_transfer_predictions_transfer.json
 uv run python scripts/score_reference.py \
     --pred results/reference/lp_music_caps_transfer/predictions/lp_music_caps_transfer_predictions_transfer.json \
     --name lp_music_caps_transfer --held-out-name lp_music_caps_transfer_clean   # leaky; clean held-out row
 
-# BLAP: stage the offline bundle on a networked machine, copy via USB, run on the GPU box
+# BLAP: fetch weights, generate in its torch-cu128 venv, then score
 ./scripts/blap_fetch.sh                       # -> blap_bundle/ (download steps + venv setup printed)
-.venv-blap/bin/python scripts/blap_generate.py \
+$BLAP_VENV/bin/python scripts/blap_generate.py \
     --ckpt blap_bundle/model/checkpoint.ckpt --model-config blap_bundle/model/config.json
 uv run python scripts/score_reference.py      # overall metrics + is_audioset_eval leakage verdict
 ```
@@ -246,8 +245,8 @@ uv run python scripts/score_reference.py      # overall metrics + is_audioset_ev
 | Reference captioner | `scripts/eval_reference_captioner.py` | Generate + score a zero-shot audio-LM (`--model-id`, `--backend`); reuses `compute_metrics` |
 | Captioner smoke tests | `scripts/try_audio_flamingo.py`, `scripts/try_qwen_audio.py` | Print REF vs HYP for a few clips before a full run |
 | Test-split manifest | `scripts/dump_test_split.py` | Dumps the shared seed-42 test split (`results/test_split.json`, with `is_audioset_eval`) for the separate-venv captioners |
-| LP-MusicCaps | `scripts/lp_musiccaps_generate.py`, `scripts/score_reference.py` | Generate (torch-1.13 CPU venv) + score; `--framework transfer` for the leaky variant |
-| BLAP | `scripts/blap_fetch.sh`, `scripts/blap_generate.py`, `scripts/score_reference.py` | Offline-stage (Mac), generate (cu128 GPU venv), score + `is_audioset_eval` leakage split |
+| LP-MusicCaps | `scripts/lp_musiccaps_generate.py`, `scripts/score_reference.py` | Generate (torch-1.13 venv) + score; `--framework transfer` for the leaky variant |
+| BLAP | `scripts/blap_fetch.sh`, `scripts/blap_generate.py`, `scripts/score_reference.py` | Fetch weights, generate (torch-cu128 venv), score + `is_audioset_eval` leakage split |
 | Reference scoring | `scripts/score_reference.py` | Model-agnostic: metrics + `is_audioset_eval` leakage split + `--held-out-name` clean row, for any reference predictions file |
 | Report artifacts | `scripts/reporting/*.py` | LaTeX table fragments and figures generated from `results/` |
 
@@ -283,17 +282,17 @@ SPICE and CIDEr-D are Java-backed (JDK 11 required, see Prerequisites). FENSE is
 Per-script descriptions are in the Pipeline Steps table above; this is the layout only.
 
 ```
-configs/      Per-model + per-encoder YAML (gpt2/t5 baseline, gpt2_<encoder> swaps;
-              opt/llama retained, out of scope)
-scripts/      Pipeline scripts (train_*, lr_search, evaluate, precompute_embeddings,
-              eval_reference_captioner, score_reference, run_*.sh, shared modules)
-  reporting/  LaTeX table + figure generators (run from repo root)
-pairwise_eval/ Pairwise A/B study + LLM-judge panel (see pairwise_eval/README.md)
-data/         Dataset and cached embeddings (embeddings/ per encoder)
-checkpoints/  Model checkpoints (encoder swaps under encoder_swap/)
-reports/      LaTeX sources (416A.tex, poster/); generated tables/ + figures/
-results/      Structured results: lr_search/ training/ predictions/ ablations/{arch,decoding}/
-              reference/<name>/ llm_judge/{audio,text}/
+configs/        Per-model + per-encoder YAML (gpt2/t5 baseline, gpt2_<encoder> swaps;
+                opt/llama retained, out of scope)
+scripts/        Pipeline scripts (train_*, lr_search, evaluate, precompute_embeddings,
+                eval_reference_captioner, score_reference, run_*.sh, shared modules)
+  reporting/    LaTeX table + figure generators (run from repo root)
+pairwise_eval/  Pairwise A/B study + LLM-judge panel (see pairwise_eval/README.md)
+data/           Dataset and cached embeddings (embeddings/ per encoder)
+checkpoints/    Model checkpoints (encoder swaps under encoder_swap/)
+reports/        LaTeX sources (416A.tex, poster/); generated tables/ + figures/
+results/        Structured results: lr_search/ training/ predictions/ ablations/{arch,decoding}/
+                reference/<name>/ llm_judge/{audio,text}/
 ```
 
 ## Reproducibility
