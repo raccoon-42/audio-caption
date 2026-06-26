@@ -176,7 +176,8 @@ def main():
                  "Our pipeline vs general-audio reference captioners (MusicCaps test)",
                  "Blue = our pipeline (comparison anchor); warm = general audio models."
                  + hatch_note)
-    _table(rows)
+    # Table rows ranked by descending FENSE; the figures above keep the domain grouping.
+    _table(sorted(rows, key=lambda r: r.metrics.get("FENSE", float("-inf")), reverse=True))
 
 
 def _row_colors(rows):
@@ -302,7 +303,8 @@ only on MSD pseudo-captions, so it is leakage-free on this split, whereas LP-Mus
 (transfer) was fine-tuned on MusicCaps official-train and overlaps ${\sim}48\%$ of
 this test split -- its inflated CIDEr-D/SPIDEr are a train-on-test signature, not a
 quality result. The \emph{held-out} rows re-score a leaky model on only the
-MusicCaps-official-eval subset ($n{=}284$), its leakage-free number. Sample counts:
+MusicCaps-official-eval subset ($n{=}284$), its leakage-free number. Rows are ordered by
+descending FENSE. Sample counts:
 """ + ns + r""".}
 \label{tab:reference-comparison}
 \begin{tabular}{l""" + "c" * len(ALL_METRICS) + r"""}
