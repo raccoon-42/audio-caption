@@ -122,7 +122,7 @@ simple projection from a frozen audio embedding?} And between two such models,
 \Large
 \begin{itemize}
   \item \textbf{Only new module:} the projection MLP ($\sim$10.2M params);
-        \clapenc{} embeddings are precomputed once, so the encoder never runs in training.
+        the \clapenc{} encoder and the LM start frozen.
   \item \textbf{Two-stage training:} Stage 1 trains the projection with the LM
         frozen; Stage 2 also fine-tunes the LM.
   \item \textbf{Evaluation:} a ten-metric suite with \fense{} as the primary
