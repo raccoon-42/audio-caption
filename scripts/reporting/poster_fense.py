@@ -112,8 +112,20 @@ def main():
     ]
     ax.legend(handles=legend, fontsize=20, loc="upper center",
               bbox_to_anchor=(0.5, -0.12), ncol=2, frameon=False)
-    ax.set_title("Lightweight ClapCap beats the clean music captioners on FENSE",
-                 fontsize=27, fontweight="bold", pad=16)
+    # Centre the title on the saved (bbox="tight") canvas, not on the axes: the wide
+    # y tick labels push the axes right, so an axes-centred title lands off-centre in
+    # the cropped figure. Measure the content extent with the title empty, then place
+    # the title at that centre expressed in axes coordinates.
+    title = "Lightweight ClapCap beats the clean music captioners on FENSE"
+    title_kw = dict(fontsize=27, fontweight="bold", pad=16)
+    ax.set_title("", **title_kw)
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    content = fig.get_tightbbox(renderer)
+    axes_box = ax.get_window_extent(renderer).transformed(
+        fig.dpi_scale_trans.inverted())
+    ax.set_title(title, **title_kw,
+                 x=((content.x0 + content.x1) / 2 - axes_box.x0) / axes_box.width)
     out = FIG_OUT / "fig_poster_fense.pdf"
     fig.savefig(out)
     plt.close(fig)

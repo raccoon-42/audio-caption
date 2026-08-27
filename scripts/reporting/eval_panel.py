@@ -198,7 +198,7 @@ def main():
     title = r"Pairwise win-rates (Fleiss' $\kappa$: " + ", ".join(kparts) + ")"
     if hl_kappa is not None:
         title += ("\n" + fr"human$\leftrightarrow$audio-LLM consensus "
-                  fr"$\kappa$ = {hl_kappa:.2f} (substantial)")
+                  fr"$\kappa$ = {hl_kappa:.2f}")
     ax.set_title(title, fontweight="bold", fontsize=21)
     ax.legend(loc="lower center", bbox_to_anchor=(0.5, -0.30),
               ncol=3, frameon=False, fontsize=19)

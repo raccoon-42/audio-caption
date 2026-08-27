@@ -253,6 +253,10 @@ def heatmap(human_cons, llm_dedup, llm_kept, key, out_path):
     pairs both label decisively."""
     import matplotlib
     matplotlib.use("Agg")
+    # TrueType instead of the Type 3 default: Type 3 fonts are rejected by
+    # IEEE PDF eXpress and carry no ToUnicode map.
+    matplotlib.rcParams["pdf.fonttype"] = 42
+    matplotlib.rcParams["ps.fonttype"] = 42
     import matplotlib.pyplot as plt
     import numpy as np
 
