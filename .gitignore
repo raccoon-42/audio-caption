@@ -24,6 +24,7 @@ blap_bundle.tar
 *.aux
 *.log
 *.out
+*.zip
 
 # IDE
 .vscode/
